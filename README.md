@@ -1,97 +1,61 @@
-This is a new [**React Native**](https://reactnative.dev) project, bootstrapped using [`@react-native-community/cli`](https://github.com/react-native-community/cli).
+# MemeAI
 
-# Getting Started
+MemeAI est une application mobile React Native CLI pour creer des memes avec une approche multimodale : texte, audio, image, atelier manuel et partage social.
 
-> **Note**: Make sure you have completed the [Set Up Your Environment](https://reactnative.dev/docs/set-up-your-environment) guide before proceeding.
+Le projet est un TP et doit rester entierement gratuit : pas de service payant, pas d'asset payant, pas de cle API exposee dans l'application mobile.
 
-## Step 1: Start Metro
+## Documentation
 
-First, you will need to run **Metro**, the JavaScript build tool for React Native.
+- Cahier des charges : [Docs/cahier_des_charges_meme_generator.md](Docs/cahier_des_charges_meme_generator.md)
+- Design system : [Docs/design.md](Docs/design.md)
+- Walkthrough de developpement jusqu'a l'APK release : [Docs/walkthrough_developpement_apk.md](Docs/walkthrough_developpement_apk.md)
 
-To start the Metro dev server, run the following command from the root of your React Native project:
+## Ecrans actuels
+
+- `Home` : packages de memes en bandes horizontales.
+- `Context` : entree multimodale texte/camera/micro/import.
+- `Atelier` : canvas et outils manuels type sticker maker.
+- `Social` : hub de partage vers reseaux sociaux.
+- `Settings` : theme clair/sombre.
+
+## Commandes utiles
+
+Installer les dependances :
 
 ```sh
-# Using npm
-npm start
-
-# OR using Yarn
-yarn start
+npm install
 ```
 
-## Step 2: Build and run your app
-
-With Metro running, open a new terminal window/pane from the root of your React Native project, and use one of the following commands to build and run your Android or iOS app:
-
-### Android
+Lancer Android en debug :
 
 ```sh
-# Using npm
 npm run android
-
-# OR using Yarn
-yarn android
 ```
 
-### iOS
-
-For iOS, remember to install CocoaPods dependencies (this only needs to be run on first clone or after updating native deps).
-
-The first time you create a new project, run the Ruby bundler to install CocoaPods itself:
+Lancer Metro :
 
 ```sh
-bundle install
+npm start
 ```
 
-Then, and every time you update your native dependencies, run:
+Verifier le projet :
 
 ```sh
-bundle exec pod install
+npm run verify
 ```
 
-For more information, please visit [CocoaPods Getting Started guide](https://guides.cocoapods.org/using/getting-started.html).
+Preparer un APK release :
 
 ```sh
-# Using npm
-npm run ios
-
-# OR using Yarn
-yarn ios
+npm run android:release
 ```
 
-If everything is set up correctly, you should see your new app running in the Android Emulator, iOS Simulator, or your connected device.
+APK attendu :
 
-This is one way to run your app — you can also build it directly from Android Studio or Xcode.
+```txt
+android/app/build/outputs/apk/release/app-release.apk
+```
 
-## Step 3: Modify your app
+## Regle de securite IA
 
-Now that you have successfully run the app, let's make changes!
-
-Open `App.tsx` in your text editor of choice and make some changes. When you save, your app will automatically update and reflect these changes — this is powered by [Fast Refresh](https://reactnative.dev/docs/fast-refresh).
-
-When you want to forcefully reload, for example to reset the state of your app, you can perform a full reload:
-
-- **Android**: Press the <kbd>R</kbd> key twice or select **"Reload"** from the **Dev Menu**, accessed via <kbd>Ctrl</kbd> + <kbd>M</kbd> (Windows/Linux) or <kbd>Cmd ⌘</kbd> + <kbd>M</kbd> (macOS).
-- **iOS**: Press <kbd>R</kbd> in iOS Simulator.
-
-## Congratulations! :tada:
-
-You've successfully run and modified your React Native App. :partying_face:
-
-### Now what?
-
-- If you want to add this new React Native code to an existing application, check out the [Integration guide](https://reactnative.dev/docs/integration-with-existing-apps).
-- If you're curious to learn more about React Native, check out the [docs](https://reactnative.dev/docs/getting-started).
-
-# Troubleshooting
-
-If you're having issues getting the above steps to work, see the [Troubleshooting](https://reactnative.dev/docs/troubleshooting) page.
-
-# Learn More
-
-To learn more about React Native, take a look at the following resources:
-
-- [React Native Website](https://reactnative.dev) - learn more about React Native.
-- [Getting Started](https://reactnative.dev/docs/environment-setup) - an **overview** of React Native and how setup your environment.
-- [Learn the Basics](https://reactnative.dev/docs/getting-started) - a **guided tour** of the React Native **basics**.
-- [Blog](https://reactnative.dev/blog) - read the latest official React Native **Blog** posts.
-- [`@facebook/react-native`](https://github.com/facebook/react-native) - the Open Source; GitHub **repository** for React Native.
+La cle IA ne doit jamais etre placee dans le code React Native. Le mobile doit appeler un backend Node/Express, et le backend seul doit lire `GEMINI_API_KEY` depuis un fichier `.env` local non commite.
