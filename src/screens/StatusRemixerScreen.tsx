@@ -1,6 +1,17 @@
-import React, {useState} from 'react';
-import {Modal, Pressable, ScrollView, StyleSheet, Text, View} from 'react-native';
+import React, {useEffect, useState} from 'react';
+import {
+  ImageBackground,
+  Modal,
+  PermissionsAndroid,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
+import RNFS from 'react-native-fs';
 import {AppCard} from '../components/AppCard';
 import {Badge} from '../components/Badge';
 import {EmptyState} from '../components/EmptyState';
@@ -13,19 +24,161 @@ import {
   type StatusItem,
 } from '../components/StatusGrid';
 import {colors, radii, spacing, typography} from '../theme/theme';
+import {useAppConfig} from '../config/AppConfigProvider';
+import {generateMemeFromImage} from '../services/api';
 
 export function StatusRemixerScreen() {
+  const {backendUrl} = useAppConfig();
   const [permissionGranted, setPermissionGranted] = useState(false);
+  const [statuses, setStatuses] = useState<StatusItem[]>([]);
   const [selected, setSelected] = useState<StatusItem | null>(null);
-  const [caption, setCaption] = useState('Quand ton statut WhatsApp devient plus drôle que prévu.');
+  const [caption, setCaption] = useState('Sélectionne un statut pour commencer le remix.');
   const [loading, setLoading] = useState(false);
+  const [placeholderUri, setPlaceholderUri] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
-  function generateCaption() {
+  // 1. Create a dummy image locally on mount to support testing mock statuses end-to-end
+  useEffect(() => {
+    async function createPlaceholderImage() {
+      try {
+        const path = `${RNFS.DocumentDirectoryPath}/placeholder_status.jpg`;
+        const fileExists = await RNFS.exists(path);
+        if (!fileExists) {
+          // Write a 1x1 transparent/dummy base64 JPEG to serve as a valid file
+          const dummyBase64 = '/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAP//////////////////////////////////////////////////////////////////////////////////////wgALCAABAAEBAREA/8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQABPxA=';
+          await RNFS.writeFile(path, dummyBase64, 'base64');
+        }
+        setPlaceholderUri(`file://${path}`);
+      } catch (err) {
+        console.warn('Failed to write placeholder status image:', err);
+      }
+    }
+    createPlaceholderImage();
+  }, []);
+
+  // 2. Request storage permissions
+  async function requestStoragePermission() {
+    if (Platform.OS !== 'android') {
+      setPermissionGranted(true);
+      return;
+    }
+    try {
+      let granted = false;
+      if (typeof Platform.Version === 'number' && Platform.Version >= 33) {
+        const results = await PermissionsAndroid.requestMultiple([
+          PermissionsAndroid.PERMISSIONS.READ_MEDIA_IMAGES,
+          PermissionsAndroid.PERMISSIONS.READ_MEDIA_VIDEO,
+        ]);
+        granted =
+          results[PermissionsAndroid.PERMISSIONS.READ_MEDIA_IMAGES] ===
+            PermissionsAndroid.RESULTS.GRANTED &&
+          results[PermissionsAndroid.PERMISSIONS.READ_MEDIA_VIDEO] ===
+            PermissionsAndroid.RESULTS.GRANTED;
+      } else {
+        const result = await PermissionsAndroid.request(
+          PermissionsAndroid.PERMISSIONS.READ_EXTERNAL_STORAGE,
+          {
+            title: 'Accès au stockage requis',
+            message: "MemeAI a besoin d'accéder à ton stockage pour lire les statuts WhatsApp.",
+            buttonPositive: 'OK',
+            buttonNegative: 'Annuler',
+          }
+        );
+        granted = result === PermissionsAndroid.RESULTS.GRANTED;
+      }
+      setPermissionGranted(granted);
+    } catch (err) {
+      console.warn('Permission request error:', err);
+      setPermissionGranted(false);
+    }
+  }
+
+  // 3. Scan WhatsApp folder when permission is granted
+  useEffect(() => {
+    if (!permissionGranted) {
+      return;
+    }
+
+    async function scanWhatsAppStatuses() {
+      const WHATSAPP_STATUS_PATH = `${RNFS.ExternalStorageDirectoryPath}/Android/media/com.whatsapp/WhatsApp/Media/.Statuses`;
+      try {
+        const exists = await RNFS.exists(WHATSAPP_STATUS_PATH);
+        if (exists) {
+          const files = await RNFS.readDir(WHATSAPP_STATUS_PATH);
+          const mapped = files
+            .filter(f => f.isFile() && /\.(jpe?g|png|gif|mp4)$/i.test(f.name))
+            .map((f, index) => {
+              const isVideo = f.name.toLowerCase().endsWith('.mp4');
+              const fallbackColors = [
+                [colors.danger, colors.orange],
+                [colors.info, colors.blue],
+                [colors.success, colors.info],
+                [colors.violet, colors.pink],
+              ][index % 4];
+              return {
+                id: f.name,
+                label: f.name.substring(0, 15),
+                type: isVideo ? 'video' : 'image',
+                colors: fallbackColors,
+                uri: `file://${f.path}`,
+              } as StatusItem;
+            });
+          setStatuses(mapped);
+        } else {
+          console.log('WhatsApp statuses directory not found. Using mock data.');
+          setStatuses(mockStatuses);
+        }
+      } catch (err) {
+        console.warn('Failed to read WhatsApp statuses:', err);
+        setStatuses(mockStatuses);
+      }
+    }
+
+    scanWhatsAppStatuses();
+  }, [permissionGranted]);
+
+  // Reset caption when selected item changes
+  useEffect(() => {
+    if (selected) {
+      setCaption('Quand ton statut WhatsApp devient plus drôle que prévu.');
+      setError(null);
+    }
+  }, [selected]);
+
+  async function generateCaption() {
+    if (!selected) {
+      return;
+    }
+
+    if (selected.type === 'video') {
+      setError("Le remixage des vidéos n'est pas encore supporté par l'IA. Choisis une image !");
+      return;
+    }
+
     setLoading(true);
-    setTimeout(() => {
-      setCaption('Moi après avoir juré que ce statut ne me concernait pas.');
+    setError(null);
+
+    try {
+      // If we are selecting a mock item (without a real file), use the placeholder JPEG.
+      // Otherwise, use the real status file path.
+      const imageUri = selected.uri && !selected.uri.includes('undefined') ? selected.uri : placeholderUri;
+
+      if (!imageUri) {
+        throw new Error('Aucune image disponible pour la génération.');
+      }
+
+      const result = await generateMemeFromImage(backendUrl, {
+        uri: imageUri,
+        name: selected.id + '.jpg',
+        type: 'image/jpeg',
+      });
+
+      setCaption(result.caption);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
       setLoading(false);
-    }, 900);
+    }
   }
 
   return (
@@ -46,17 +199,17 @@ export function StatusRemixerScreen() {
             </Text>
             <GradientButton
               label="Autoriser l'accès"
-              onPress={() => setPermissionGranted(true)}
+              onPress={requestStoragePermission}
               style={styles.permissionButton}
             />
           </AppCard>
-        ) : mockStatuses.length > 0 ? (
+        ) : statuses.length > 0 ? (
           <>
             <View style={styles.galleryHeader}>
               <Text style={styles.sectionTitle}>Statuts WhatsApp</Text>
-              <Badge label={`${mockStatuses.length}`} tone="info" />
+              <Badge label={`${statuses.length}`} tone="info" />
             </View>
-            <StatusGrid data={mockStatuses} onSelect={setSelected} />
+            <StatusGrid data={statuses} onSelect={setSelected} />
           </>
         ) : (
           <EmptyState
@@ -81,9 +234,20 @@ export function StatusRemixerScreen() {
 
             {selected ? (
               <ScrollView contentContainerStyle={styles.sheetContent}>
-                <LinearGradient colors={selected.colors} style={styles.selectedImage}>
-                  <Text style={styles.overlayText}>{caption}</Text>
-                </LinearGradient>
+                {selected.uri && !selected.uri.includes('undefined') ? (
+                  <ImageBackground
+                    source={{uri: selected.uri}}
+                    style={styles.selectedImage}
+                    imageStyle={styles.selectedImageBorder}>
+                    <Text style={styles.overlayText}>{caption}</Text>
+                  </ImageBackground>
+                ) : (
+                  <LinearGradient colors={selected.colors} style={styles.selectedImage}>
+                    <Text style={styles.overlayText}>{caption}</Text>
+                  </LinearGradient>
+                )}
+
+                {error ? <Text style={styles.errorText}>{error}</Text> : undefined}
 
                 <Text style={styles.sheetLabel}>Texte généré :</Text>
                 <Text style={styles.generatedCaption}>"{caption}"</Text>
@@ -228,6 +392,9 @@ const styles = StyleSheet.create({
     padding: spacing.lg,
     marginBottom: spacing.xxl,
   },
+  selectedImageBorder: {
+    borderRadius: radii.lg,
+  },
   overlayText: {
     color: colors.text,
     fontSize: 24,
@@ -237,6 +404,12 @@ const styles = StyleSheet.create({
     textShadowColor: '#000000',
     textShadowRadius: 5,
     textShadowOffset: {width: 1, height: 1},
+  },
+  errorText: {
+    color: colors.danger,
+    marginBottom: spacing.lg,
+    textAlign: 'center',
+    ...typography.body,
   },
   sheetLabel: {
     ...typography.label,

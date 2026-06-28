@@ -1,14 +1,24 @@
 const express = require('express');
 const multer = require('multer');
-const {cleanupFile, upload} = require('../services/uploads');
+const {cleanupFile, uploadImage} = require('../services/uploads');
 const {generateCaptionFromImage} = require('../services/gemini');
 
 const router = express.Router();
-const singleImage = multer(upload).single('image');
+const singleImage = multer(uploadImage).single('image');
 
 router.post('/', (req, res, next) => {
   singleImage(req, res, async error => {
     if (error) {
+      if (error.code === 'LIMIT_FILE_SIZE') {
+        return res.status(413).json({
+          error: 'Le fichier image est trop volumineux. La limite est de 8 Mo.',
+        });
+      }
+      if (error.code === 'INVALID_FILE_TYPE') {
+        return res.status(400).json({
+          error: error.message,
+        });
+      }
       return next(error);
     }
 
@@ -28,3 +38,4 @@ router.post('/', (req, res, next) => {
 });
 
 module.exports = router;
+

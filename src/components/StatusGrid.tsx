@@ -1,5 +1,5 @@
 import React from 'react';
-import {FlatList, Pressable, StyleSheet, Text, View} from 'react-native';
+import {FlatList, Image, Pressable, StyleSheet, Text, View} from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import {colors, radii, rainbow, spacing, typography} from '../theme/theme';
 import {IconSymbol} from './IconSymbol';
@@ -9,6 +9,7 @@ export type StatusItem = {
   label: string;
   type: 'image' | 'video';
   colors: string[];
+  uri?: string;
 };
 
 type StatusGridProps = {
@@ -31,17 +32,26 @@ export function StatusGrid({data, onSelect}: StatusGridProps) {
           accessibilityLabel={`Choisir ${item.label}`}
           onPress={() => onSelect(item)}
           style={({pressed}) => [styles.cell, pressed && styles.pressed]}>
-          <LinearGradient colors={item.colors} style={styles.tile}>
-            <View style={styles.tileTop}>
-              <Text style={styles.tileLabel}>{item.label}</Text>
-              {item.type === 'video' ? (
-                <View style={styles.videoBadge}>
-                  <IconSymbol name="video" color="#FFFFFF" size={14} />
-                </View>
-              ) : undefined}
+          {item.uri ? (
+            <Image source={{uri: item.uri}} style={styles.tileImage} />
+          ) : (
+            <LinearGradient colors={item.colors} style={styles.tile}>
+              <View style={styles.tileTop}>
+                <Text style={styles.tileLabel}>{item.label}</Text>
+                {item.type === 'video' ? (
+                  <View style={styles.videoBadge}>
+                    <IconSymbol name="video" color="#FFFFFF" size={14} />
+                  </View>
+                ) : undefined}
+              </View>
+              <Text style={styles.mockImage}>MemeAI</Text>
+            </LinearGradient>
+          )}
+          {item.uri && item.type === 'video' ? (
+            <View style={styles.videoBadgeOverlay}>
+              <IconSymbol name="video" color="#FFFFFF" size={14} />
             </View>
-            <Text style={styles.mockImage}>MemeAI</Text>
-          </LinearGradient>
+          ) : undefined}
         </Pressable>
       )}
       ListFooterComponent={<View style={styles.footerLine} />}
@@ -73,6 +83,11 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     backgroundColor: colors.input,
   },
+  tileImage: {
+    width: '100%',
+    height: '100%',
+    resizeMode: 'cover',
+  },
   tile: {
     flex: 1,
     padding: spacing.md,
@@ -92,6 +107,17 @@ const styles = StyleSheet.create({
     height: 28,
     borderRadius: 14,
     backgroundColor: 'rgba(0,0,0,0.35)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  videoBadgeOverlay: {
+    position: 'absolute',
+    top: spacing.md,
+    right: spacing.md,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: 'rgba(0,0,0,0.5)',
     alignItems: 'center',
     justifyContent: 'center',
   },

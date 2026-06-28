@@ -1,46 +1,101 @@
 import React, {useEffect, useState} from 'react';
-import {Pressable, ScrollView, StyleSheet, Text, View} from 'react-native';
+import {PermissionsAndroid, Platform, Pressable, ScrollView, StyleSheet, Text, View} from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
+import AudioRecorderPlayer from 'react-native-audio-recorder-player';
 import {IconSymbol, type IconName} from '../components/IconSymbol';
 import {MemePreview} from '../components/MemePreview';
 import {ScreenHeader} from '../components/ScreenHeader';
 import {Waveform} from '../components/Waveform';
 import {colors, radii, rainbow, spacing, typography} from '../theme/theme';
+import {useAppConfig} from '../config/AppConfigProvider';
+import {generateMemeFromAudio} from '../services/api';
+import type {GeneratedMeme} from '../types/meme';
 
 type VoiceState = 'idle' | 'recording' | 'processing' | 'done';
 
 export function VoiceToMemeScreen() {
+  const {backendUrl} = useAppConfig();
   const [state, setState] = useState<VoiceState>('idle');
-  const [seconds, setSeconds] = useState(0);
+  const [recordTime, setRecordTime] = useState('00:00:00');
+  const [audioRecorderPlayer] = useState(() => new AudioRecorderPlayer());
+  const [result, setResult] = useState<GeneratedMeme | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (state !== 'recording') {
-      return;
+    return () => {
+      audioRecorderPlayer.stopRecorder().catch(() => {});
+      audioRecorderPlayer.removeRecordBackListener();
+    };
+  }, [audioRecorderPlayer]);
+
+  async function requestAudioPermission() {
+    if (Platform.OS !== 'android') {
+      return true;
     }
+    try {
+      const granted = await PermissionsAndroid.request(
+        PermissionsAndroid.PERMISSIONS.RECORD_AUDIO,
+        {
+          title: 'Permission micro',
+          message: 'MemeAI a besoin du micro pour transcrire votre contexte.',
+          buttonPositive: 'OK',
+          buttonNegative: 'Annuler',
+        },
+      );
+      return granted === PermissionsAndroid.RESULTS.GRANTED;
+    } catch (err) {
+      console.warn(err);
+      return false;
+    }
+  }
 
-    const interval = setInterval(() => {
-      setSeconds(value => value + 1);
-    }, 1000);
-
-    return () => clearInterval(interval);
-  }, [state]);
-
-  function handleRecordPress() {
+  async function handleRecordPress() {
     if (state === 'idle' || state === 'done') {
-      setSeconds(0);
-      setState('recording');
+      const hasPermission = await requestAudioPermission();
+      if (!hasPermission) {
+        setError('Permission micro refusée.');
+        return;
+      }
+      try {
+        setError(null);
+        setResult(null);
+        setRecordTime('00:00:00');
+        setState('recording');
+        await audioRecorderPlayer.startRecorder();
+        audioRecorderPlayer.addRecordBackListener((e: any) => {
+          setRecordTime(audioRecorderPlayer.mmssss(Math.floor(e.currentPosition)));
+        });
+      } catch (err) {
+        setError(`Erreur démarrage micro: ${err instanceof Error ? err.message : String(err)}`);
+        setState('idle');
+      }
       return;
     }
 
     if (state === 'recording') {
-      setState('processing');
-      setTimeout(() => setState('done'), 1000);
+      try {
+        setState('processing');
+        const resultUri = await audioRecorderPlayer.stopRecorder();
+        audioRecorderPlayer.removeRecordBackListener();
+        
+        if (resultUri) {
+          const generated = await generateMemeFromAudio(backendUrl, {
+            uri: resultUri,
+            name: 'vocal_enregistrement.mp4',
+            type: 'audio/mp4',
+          });
+          setResult(generated);
+          setState('done');
+        } else {
+          throw new Error('Aucun fichier audio enregistré.');
+        }
+      } catch (err) {
+        setError(`Erreur génération mème: ${err instanceof Error ? err.message : String(err)}`);
+        setState('idle');
+      }
     }
   }
 
-  const time = `${String(Math.floor(seconds / 60)).padStart(2, '0')}:${String(
-    seconds % 60,
-  ).padStart(2, '0')}`;
   const isRecording = state === 'recording';
   const isProcessing = state === 'processing';
   const recordIcon: IconName = isProcessing
@@ -57,7 +112,9 @@ export function VoiceToMemeScreen() {
       <ScrollView contentContainerStyle={styles.content}>
         <Waveform active={isRecording || isProcessing} />
 
-        <Text style={styles.timer}>{time}</Text>
+        <Text style={styles.timer}>{recordTime}</Text>
+
+        {error ? <Text style={styles.errorText}>{error}</Text> : undefined}
 
         <Pressable
           accessibilityRole="button"
@@ -83,18 +140,19 @@ export function VoiceToMemeScreen() {
           {state === 'idle'
             ? 'Appuie pour commencer'
             : state === 'recording'
-              ? `En cours... ${time}`
+              ? `En cours... ${recordTime}`
               : state === 'processing'
                 ? "L'IA analyse..."
                 : 'Terminé !'}
         </Text>
 
-        {state === 'done' ? (
+        {state === 'done' && result ? (
           <View style={styles.preview}>
             <MemePreview
               title="Mème généré"
-              transcription="Je voulais juste envoyer une note vocale rapide, maintenant tout le groupe débat."
-              caption="POV: ta note vocale devient une réunion d'urgence."
+              transcription={result.transcription}
+              caption={result.caption}
+              tone={result.tone}
             />
           </View>
         ) : undefined}
@@ -120,6 +178,12 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     marginTop: spacing.xxxl,
     fontVariant: ['tabular-nums'],
+  },
+  errorText: {
+    color: colors.danger,
+    marginTop: spacing.lg,
+    textAlign: 'center',
+    ...typography.body,
   },
   recordButton: {
     width: 88,

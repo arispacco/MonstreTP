@@ -25,27 +25,53 @@ async function generateCaptionFromText(text) {
     `Contexte utilisateur: ${text}`,
   ].join('\n');
 
-  const response = await fetch(
-    `${endpointBase}/${model}:generateContent?key=${apiKey}`,
-    {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({
-        contents: [
-          {
-            role: 'user',
-            parts: [{text: prompt}],
+  let response;
+  try {
+    response = await fetch(
+      `${endpointBase}/${model}:generateContent?key=${apiKey}`,
+      {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+          contents: [
+            {
+              role: 'user',
+              parts: [{text: prompt}],
+            },
+          ],
+          generationConfig: {
+            temperature: 0.85,
+            maxOutputTokens: 180,
+            responseMimeType: 'application/json',
           },
-        ],
-        generationConfig: {
-          temperature: 0.85,
-          maxOutputTokens: 180,
-        },
-      }),
-    },
-  );
+        }),
+      },
+    );
+  } catch (fetchErr) {
+    console.error('Fetch error during generateCaptionFromText:', fetchErr);
+    if (allowMock) {
+      return mockCaption(text);
+    }
+    const error = new Error('Erreur reseau vers l\'API Gemini.');
+    error.status = 502;
+    error.publicMessage = 'Generation IA indisponible.';
+    throw error;
+  }
 
   if (!response.ok) {
+    let errorDetails = '';
+    try {
+      const errPayload = await response.json();
+      errorDetails = JSON.stringify(errPayload);
+    } catch {
+      try {
+        errorDetails = await response.text();
+      } catch {
+        errorDetails = 'Impossible de lire le corps de l\'erreur';
+      }
+    }
+    console.error(`Gemini API Error in generateCaptionFromText [${response.status}]: ${errorDetails}`);
+
     if (allowMock) {
       return mockCaption(text);
     }
@@ -93,35 +119,61 @@ async function generateCaptionFromVoice(audioFilePath, mimeType) {
     'La caption doit etre courte, drole, partageable, sans contenu haineux.',
   ].join('\n');
 
-  const response = await fetch(
-    `${endpointBase}/${model}:generateContent?key=${apiKey}`,
-    {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({
-        contents: [
-          {
-            role: 'user',
-            parts: [
-              {
-                inlineData: {
-                  mimeType: mimeType || 'audio/mp3',
-                  data: audioBase64,
+  let response;
+  try {
+    response = await fetch(
+      `${endpointBase}/${model}:generateContent?key=${apiKey}`,
+      {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+          contents: [
+            {
+              role: 'user',
+              parts: [
+                {
+                  inlineData: {
+                    mimeType: mimeType || 'audio/mp3',
+                    data: audioBase64,
+                  },
                 },
-              },
-              {text: prompt},
-            ],
+                {text: prompt},
+              ],
+            },
+          ],
+          generationConfig: {
+            temperature: 0.85,
+            maxOutputTokens: 250,
+            responseMimeType: 'application/json',
           },
-        ],
-        generationConfig: {
-          temperature: 0.85,
-          maxOutputTokens: 250,
-        },
-      }),
-    },
-  );
+        }),
+      },
+    );
+  } catch (fetchErr) {
+    console.error('Fetch error during generateCaptionFromVoice:', fetchErr);
+    if (allowMock) {
+      return mockVoice();
+    }
+    const error = new Error('Erreur reseau vers l\'API Gemini.');
+    error.status = 502;
+    error.publicMessage = 'Generation IA audio indisponible.';
+    throw error;
+  }
 
   if (!response.ok) {
+    let errorDetails = '';
+    try {
+      const errPayload = await response.json();
+      errorDetails = JSON.stringify(errPayload);
+    } catch {
+      try {
+        errorDetails = await response.text();
+      } catch {
+        errorDetails = 'Impossible de lire le corps de l\'erreur';
+      }
+    }
+    console.error(`Gemini API Error in generateCaptionFromVoice [${response.status}]: ${errorDetails}`);
+
     if (allowMock) {
       return mockVoice();
     }
@@ -169,35 +221,61 @@ async function generateCaptionFromImage(imageFilePath, mimeType) {
     'La caption doit etre courte, drole, partageable, sans contenu haineux.',
   ].join('\n');
 
-  const response = await fetch(
-    `${endpointBase}/${model}:generateContent?key=${apiKey}`,
-    {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({
-        contents: [
-          {
-            role: 'user',
-            parts: [
-              {
-                inlineData: {
-                  mimeType: mimeType || 'image/jpeg',
-                  data: imageBase64,
+  let response;
+  try {
+    response = await fetch(
+      `${endpointBase}/${model}:generateContent?key=${apiKey}`,
+      {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+          contents: [
+            {
+              role: 'user',
+              parts: [
+                {
+                  inlineData: {
+                    mimeType: mimeType || 'image/jpeg',
+                    data: imageBase64,
+                  },
                 },
-              },
-              {text: prompt},
-            ],
+                {text: prompt},
+              ],
+            },
+          ],
+          generationConfig: {
+            temperature: 0.85,
+            maxOutputTokens: 250,
+            responseMimeType: 'application/json',
           },
-        ],
-        generationConfig: {
-          temperature: 0.85,
-          maxOutputTokens: 250,
-        },
-      }),
-    },
-  );
+        }),
+      },
+    );
+  } catch (fetchErr) {
+    console.error('Fetch error during generateCaptionFromImage:', fetchErr);
+    if (allowMock) {
+      return mockImage();
+    }
+    const error = new Error('Erreur reseau vers l\'API Gemini.');
+    error.status = 502;
+    error.publicMessage = 'Generation IA image indisponible.';
+    throw error;
+  }
 
   if (!response.ok) {
+    let errorDetails = '';
+    try {
+      const errPayload = await response.json();
+      errorDetails = JSON.stringify(errPayload);
+    } catch {
+      try {
+        errorDetails = await response.text();
+      } catch {
+        errorDetails = 'Impossible de lire le corps de l\'erreur';
+      }
+    }
+    console.error(`Gemini API Error in generateCaptionFromImage [${response.status}]: ${errorDetails}`);
+
     if (allowMock) {
       return mockImage();
     }
@@ -223,7 +301,23 @@ async function generateCaptionFromImage(imageFilePath, mimeType) {
 }
 
 function parseJsonResponse(rawText) {
-  const cleaned = rawText
+  const trimmed = rawText.trim();
+  try {
+    return JSON.parse(trimmed);
+  } catch (initialErr) {
+    // Si parse direct échoue, on essaie d'extraire la première chaîne JSON {}
+    const jsonMatch = trimmed.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      try {
+        return JSON.parse(jsonMatch[0].trim());
+      } catch (nestedErr) {
+        console.warn('Echec de parsing du JSON extrait de la reponse:', nestedErr);
+      }
+    }
+  }
+
+  // Fallback si l'IA a renvoyé du markdown récalcitrant
+  const cleaned = trimmed
     .replace(/^```json\s*/i, '')
     .replace(/^```\s*/i, '')
     .replace(/```$/i, '')
