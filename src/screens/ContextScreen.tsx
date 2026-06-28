@@ -47,7 +47,7 @@ export function ContextScreen() {
   const [fileAttachment, setFileAttachment] = useState<AttachmentInfo | null>(null);
 
   // Audio Recorder State
-  const audioRecorderPlayer = AudioRecorderPlayer;
+  const [audioRecorderPlayer] = useState(() => new AudioRecorderPlayer());
   const [recording, setRecording] = useState(false);
   const [recordTime, setRecordTime] = useState('00:00:00');
 
