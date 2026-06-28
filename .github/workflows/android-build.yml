@@ -1,13 +1,17 @@
-name: Android Build CI
+name: Android Release Build CI
 
 on:
   push:
     branches:
       - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
 
 jobs:
   build:
-    name: Build Android Debug and Release
+    name: Build Android Release APK
     runs-on: ubuntu-latest
 
     steps:
@@ -32,59 +36,13 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
 
-      - name: Decode Keystore (Optional)
-        env:
-          KEYSTORE_BASE64: ${{ secrets.MEMEAI_KEYSTORE_BASE64 }}
-        if: ${{ env.KEYSTORE_BASE64 != '' }}
-        run: |
-          echo "$KEYSTORE_BASE64" | base64 --decode > android/app/memeai-release-key.keystore
-
-      - name: Configure Gradle properties for signing (Optional)
-        env:
-          KEYSTORE_BASE64: ${{ secrets.MEMEAI_KEYSTORE_BASE64 }}
-          STORE_PASSWORD: ${{ secrets.MEMEAI_UPLOAD_STORE_PASSWORD }}
-          KEY_ALIAS: ${{ secrets.MEMEAI_UPLOAD_KEY_ALIAS }}
-          KEY_PASSWORD: ${{ secrets.MEMEAI_UPLOAD_KEY_PASSWORD }}
-        if: ${{ env.KEYSTORE_BASE64 != '' }}
-        run: |
-          echo "MEMEAI_UPLOAD_STORE_FILE=memeai-release-key.keystore" >> android/gradle.properties
-          echo "MEMEAI_UPLOAD_KEY_ALIAS=$KEY_ALIAS" >> android/gradle.properties
-          echo "MEMEAI_UPLOAD_STORE_PASSWORD=$STORE_PASSWORD" >> android/gradle.properties
-          echo "MEMEAI_UPLOAD_KEY_PASSWORD=$KEY_PASSWORD" >> android/gradle.properties
-
-      - name: Build Debug APK
-        run: |
-          cd android
-          if ! ./gradlew assembleDebug > ../build-debug.log 2>&1; then
-            cat ../build-debug.log
-            exit 1
-          fi
-
       - name: Build Release APK
         run: |
           cd android
-          if ! ./gradlew assembleRelease > ../build-release.log 2>&1; then
-            cat ../build-release.log
-            exit 1
-          fi
-
-      - name: Upload Debug APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: app-debug
-          path: android/app/build/outputs/apk/debug/app-debug.apk
+          ./gradlew assembleRelease
 
       - name: Upload Release APK
         uses: actions/upload-artifact@v4
         with:
-          name: app-release
-          path: android/app/build/outputs/apk/release/app-release.apk
-
-      - name: Upload Build Logs on Failure
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: build-failure-logs
-          path: |
-            build-debug.log
-            build-release.log
+          name: app-release-unsigned
+          path: android/app/build/outputs/apk/release/app-release-unsigned.apk
