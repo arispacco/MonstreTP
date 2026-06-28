@@ -8,6 +8,7 @@ import {AppCard} from './AppCard';
 import {Badge} from './Badge';
 import {IconSymbol} from './IconSymbol';
 import {SecondaryButton} from './SecondaryButton';
+import {useNavigation} from '@react-navigation/native';
 
 type MemePreviewProps = {
   title?: string;
@@ -24,6 +25,7 @@ export function MemePreview({
 }: MemePreviewProps) {
   const {colors} = useAppTheme();
   const [status, setStatus] = useState<string | null>(null);
+  const navigation = useNavigation<any>();
 
   async function handleShare() {
     try {
@@ -60,9 +62,13 @@ export function MemePreview({
 
       <View style={styles.actions}>
         <SecondaryButton
-          label="Copier"
-          onPress={() => setStatus('Sauvegarde galerie à brancher après export image.')}
-          icon={<IconSymbol name="download" color={colors.text} size={18} />}
+          label="Modifier"
+          onPress={() => {
+            navigation.navigate('Atelier', {
+              caption: caption,
+            });
+          }}
+          icon={<IconSymbol name="atelier" color={colors.text} size={18} />}
         />
         <SecondaryButton
           label="Partager"

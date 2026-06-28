@@ -14,6 +14,7 @@ import {memePackages} from '../data/memePackages';
 import {useAppTheme} from '../theme/ThemeProvider';
 import {spacing, typography} from '../theme/theme';
 import type {MemePackage, MemePreviewItem} from '../types/meme';
+import {useNavigation} from '@react-navigation/native';
 
 export function HomeScreen() {
   const {colors} = useAppTheme();
@@ -41,15 +42,21 @@ export function HomeScreen() {
               {selectedPackage.title}
             </Text>
             <Text style={[styles.packageSubtitle, {color: colors.textMuted}]}>
-              {selectedPackage.subtitle}
+              {selectedPackage.subtitle} • {selectedPackage.memes.length} mèmes
             </Text>
           </View>
         </View>
 
         <ScrollView contentContainerStyle={styles.fullGrid}>
-          {selectedPackage.memes.map(meme => (
-            <MemeTile key={meme.id} meme={meme} large />
-          ))}
+          {selectedPackage.memes.length === 0 ? (
+            <View style={styles.emptyContainer}>
+              <Text style={[styles.emptyText, {color: colors.textMuted}]}>Aucun mème disponible dans ce package.</Text>
+            </View>
+          ) : (
+            selectedPackage.memes.map(meme => (
+              <MemeTile key={meme.id} meme={meme} large />
+            ))
+          )}
         </ScrollView>
       </View>
     );
@@ -62,42 +69,48 @@ export function HomeScreen() {
         subtitle="Découvre des packages de mèmes prêts à adapter"
       />
       <ScrollView contentContainerStyle={styles.content}>
-        {memePackages.map(pkg => (
-          <View key={pkg.id} style={styles.packageSection}>
-            <View style={styles.sectionHeader}>
-              <View style={styles.sectionCopy}>
-                <Text style={[styles.sectionTitle, {color: colors.text}]}>
-                  {pkg.title}
-                </Text>
-                <Text style={[styles.sectionSubtitle, {color: colors.textMuted}]}>
-                  {pkg.subtitle}
-                </Text>
-              </View>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel={`Afficher ${pkg.title}`}
-                onPress={() => setSelectedPackage(pkg)}
-                style={({pressed}) => [
-                  styles.showButton,
-                  {borderColor: colors.border, backgroundColor: colors.card},
-                  pressed && styles.pressed,
-                ]}>
-                <Text style={[styles.showLabel, {color: colors.text}]}>
-                  Afficher
-                </Text>
-              </Pressable>
-            </View>
-
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.packageRail}>
-              {pkg.memes.map(meme => (
-                <MemeTile key={meme.id} meme={meme} />
-              ))}
-            </ScrollView>
+        {memePackages.length === 0 ? (
+          <View style={styles.emptyContainer}>
+            <Text style={[styles.emptyText, {color: colors.textMuted}]}>Aucun package disponible.</Text>
           </View>
-        ))}
+        ) : (
+          memePackages.map(pkg => (
+            <View key={pkg.id} style={styles.packageSection}>
+              <View style={styles.sectionHeader}>
+                <View style={styles.sectionCopy}>
+                  <Text style={[styles.sectionTitle, {color: colors.text}]}>
+                    {pkg.title}
+                  </Text>
+                  <Text style={[styles.sectionSubtitle, {color: colors.textMuted}]}>
+                    {pkg.subtitle}
+                  </Text>
+                </View>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={`Afficher ${pkg.title}`}
+                  onPress={() => setSelectedPackage(pkg)}
+                  style={({pressed}) => [
+                    styles.showButton,
+                    {borderColor: colors.border, backgroundColor: colors.card},
+                    pressed && styles.pressed,
+                  ]}>
+                  <Text style={[styles.showLabel, {color: colors.text}]}>
+                    Afficher
+                  </Text>
+                </Pressable>
+              </View>
+
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.packageRail}>
+                {pkg.memes.map(meme => (
+                  <MemeTile key={meme.id} meme={meme} />
+                ))}
+              </ScrollView>
+            </View>
+          ))
+        )}
       </ScrollView>
     </View>
   );
@@ -111,15 +124,10 @@ function MemeTile({
   large?: boolean;
 }) {
   const {colors} = useAppTheme();
+  const navigation = useNavigation<any>();
 
   return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={meme.title}
-      style={({pressed}) => [
-        large ? styles.tileLarge : styles.tile,
-        pressed && styles.pressed,
-      ]}>
+    <View style={large ? styles.tileLarge : styles.tile}>
       <LinearGradient colors={meme.palette} style={styles.tileArt}>
         <View style={styles.tileBadgeRow}>
           <Badge label="MemeAI" tone="info" />
@@ -128,12 +136,29 @@ function MemeTile({
       </LinearGradient>
       <View style={[styles.tileCaption, {backgroundColor: colors.card}]}>
         <Text
-          numberOfLines={large ? 3 : 2}
+          numberOfLines={large ? 2 : 1}
           style={[styles.tileCaptionText, {color: colors.text}]}>
           {meme.caption}
         </Text>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={`Utiliser le mème ${meme.title}`}
+          style={({pressed}) => [
+            styles.useButton,
+            {backgroundColor: colors.info},
+            pressed && styles.pressed,
+          ]}
+          onPress={() => {
+            navigation.navigate('Atelier', {
+              caption: meme.caption,
+              palette: meme.palette,
+              title: meme.title,
+            });
+          }}>
+          <Text style={styles.useButtonText}>Utiliser</Text>
+        </Pressable>
       </View>
-    </Pressable>
+    </View>
   );
 }
 
@@ -253,5 +278,27 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: spacing.md,
+  },
+  emptyContainer: {
+    flex: 1,
+    padding: spacing.xxxl,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  emptyText: {
+    ...typography.body,
+    textAlign: 'center',
+  },
+  useButton: {
+    height: 28,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: spacing.md,
+  },
+  useButtonText: {
+    ...typography.label,
+    color: '#FFFFFF',
+    fontSize: 12,
   },
 });

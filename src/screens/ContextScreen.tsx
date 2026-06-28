@@ -1,4 +1,4 @@
-import React, {useState} from 'react';
+import React, {useState, useEffect} from 'react';
 import {
   ActivityIndicator,
   Pressable,
@@ -6,49 +6,33 @@ import {
   StyleSheet,
   Text,
   View,
+  PermissionsAndroid,
+  Platform,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import {AppCard} from '../components/AppCard';
 import {GradientButton} from '../components/GradientButton';
-import {IconSymbol, type IconName} from '../components/IconSymbol';
+import {IconSymbol} from '../components/IconSymbol';
 import {MemePreview} from '../components/MemePreview';
 import {ScreenHeader} from '../components/ScreenHeader';
 import {TextInputBox} from '../components/TextInputBox';
 import {useAppConfig} from '../config/AppConfigProvider';
-import {generateMemeFromText} from '../services/api';
+import {generateMemeFromText, generateMemeFromAudio, generateMemeFromImage} from '../services/api';
 import {useAppTheme} from '../theme/ThemeProvider';
 import {rainbow, spacing, typography} from '../theme/theme';
 import type {GeneratedMeme} from '../types/meme';
+import {launchCamera} from 'react-native-image-picker';
+import DocumentPicker from 'react-native-document-picker';
+import AudioRecorderPlayer from 'react-native-audio-recorder-player';
 
 const MAX_LENGTH = 700;
 
-type InputAction = {
-  icon: IconName;
-  label: string;
-  helper: string;
-  attachmentLabel: string;
+type AttachmentInfo = {
+  uri: string;
+  name: string;
+  type: string;
+  mode: 'camera' | 'mic' | 'import';
 };
-
-const inputActions: InputAction[] = [
-  {
-    icon: 'camera',
-    label: 'Caméra',
-    helper: 'Capture photo prête à brancher.',
-    attachmentLabel: 'Photo capturée',
-  },
-  {
-    icon: 'mic',
-    label: 'Micro',
-    helper: 'Enregistrement audio prêt à brancher.',
-    attachmentLabel: 'Note vocale enregistrée',
-  },
-  {
-    icon: 'import',
-    label: 'Importer',
-    helper: 'Explorateur de fichiers prêt à brancher.',
-    attachmentLabel: 'Fichier importé',
-  },
-];
 
 export function ContextScreen() {
   const {colors} = useAppTheme();
@@ -60,17 +44,165 @@ export function ContextScreen() {
   );
   const [result, setResult] = useState<GeneratedMeme | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [attachment, setAttachment] = useState<InputAction | null>(null);
+  const [fileAttachment, setFileAttachment] = useState<AttachmentInfo | null>(null);
 
-  function handleInputAction(action: InputAction) {
+  // Audio Recorder State
+  const audioRecorderPlayer = AudioRecorderPlayer;
+  const [recording, setRecording] = useState(false);
+  const [recordTime, setRecordTime] = useState('00:00:00');
+
+  useEffect(() => {
+    return () => {
+      // Clean up player on unmount
+      audioRecorderPlayer.stopRecorder().catch(() => {});
+      audioRecorderPlayer.removeRecordBackListener();
+    };
+  }, [audioRecorderPlayer]);
+
+  async function requestAudioPermission() {
+    if (Platform.OS !== 'android') {
+      return true;
+    }
+    try {
+      const granted = await PermissionsAndroid.request(
+        PermissionsAndroid.PERMISSIONS.RECORD_AUDIO,
+        {
+          title: 'Permission micro',
+          message: 'MemeAI a besoin du micro pour transcrire votre contexte.',
+          buttonPositive: 'OK',
+          buttonNegative: 'Annuler',
+        },
+      );
+      return granted === PermissionsAndroid.RESULTS.GRANTED;
+    } catch (err) {
+      console.warn(err);
+      return false;
+    }
+  }
+
+  async function handleCamera() {
     setResult(null);
     setError(null);
-    setAttachment(action);
-    setHelper(action.helper);
+    
+    if (Platform.OS === 'android') {
+      try {
+        const granted = await PermissionsAndroid.request(
+          PermissionsAndroid.PERMISSIONS.CAMERA,
+          {
+            title: 'Permission Caméra',
+            message: 'MemeAI a besoin de la caméra pour prendre une photo.',
+            buttonPositive: 'OK',
+            buttonNegative: 'Annuler',
+          },
+        );
+        if (granted !== PermissionsAndroid.RESULTS.GRANTED) {
+          setError('Permission caméra refusée.');
+          return;
+        }
+      } catch (err) {
+        console.warn(err);
+        return;
+      }
+    }
+
+    launchCamera(
+      {
+        mediaType: 'photo',
+        quality: 0.8,
+      },
+      response => {
+        if (response.didCancel) {
+          return;
+        }
+        if (response.errorCode) {
+          setError(`Erreur caméra: ${response.errorMessage || response.errorCode}`);
+          return;
+        }
+        const asset = response.assets?.[0];
+        if (asset && asset.uri) {
+          setFileAttachment({
+            uri: asset.uri,
+            name: asset.fileName || 'camera_photo.jpg',
+            type: asset.type || 'image/jpeg',
+            mode: 'camera',
+          });
+          setHelper('Photo capturée avec succès. Prête à générer.');
+        }
+      },
+    );
+  }
+
+  async function handleMicToggle() {
+    setResult(null);
+    setError(null);
+
+    if (recording) {
+      // Stop recording
+      try {
+        const resultUri = await audioRecorderPlayer.stopRecorder();
+        audioRecorderPlayer.removeRecordBackListener();
+        setRecording(false);
+        if (resultUri) {
+          setFileAttachment({
+            uri: resultUri,
+            name: 'vocal_enregistrement.mp4',
+            type: 'audio/mp4',
+            mode: 'mic',
+          });
+          setHelper('Message vocal enregistré. Prêt à générer.');
+        }
+      } catch (err) {
+        setError(`Erreur arrêt micro: ${err instanceof Error ? err.message : String(err)}`);
+        setRecording(false);
+      }
+    } else {
+      // Start recording
+      const hasPermission = await requestAudioPermission();
+      if (!hasPermission) {
+        setError('Permission micro refusée.');
+        return;
+      }
+      try {
+        setFileAttachment(null);
+        setRecording(true);
+        setRecordTime('00:00:00');
+        await audioRecorderPlayer.startRecorder();
+        audioRecorderPlayer.addRecordBackListener((e: any) => {
+          setRecordTime(audioRecorderPlayer.mmssss(Math.floor(e.currentPosition)));
+        });
+      } catch (err) {
+        setError(`Erreur démarrage micro: ${err instanceof Error ? err.message : String(err)}`);
+        setRecording(false);
+      }
+    }
+  }
+
+  async function handleImport() {
+    setResult(null);
+    setError(null);
+    try {
+      const res = await DocumentPicker.pickSingle({
+        type: [DocumentPicker.types.images, DocumentPicker.types.audio],
+      });
+      if (res.uri) {
+        setFileAttachment({
+          uri: res.uri,
+          name: res.name || 'fichier_importe',
+          type: res.type || 'application/octet-stream',
+          mode: 'import',
+        });
+        setHelper(`Fichier importé : ${res.name}. Prêt à générer.`);
+      }
+    } catch (err) {
+      if (DocumentPicker.isCancel(err)) {
+        return;
+      }
+      setError(`Erreur d'importation: ${err instanceof Error ? err.message : String(err)}`);
+    }
   }
 
   async function generateMeme() {
-    if (!text.trim() && !attachment) {
+    if (!text.trim() && !fileAttachment) {
       setHelper('Ajoute d’abord un texte ou importe un contenu pour créer un mème.');
       return;
     }
@@ -81,8 +213,28 @@ export function ContextScreen() {
     setHelper("L'IA mélange le contexte, le ton et la punchline.");
 
     try {
-      const contextText = text.trim() || attachment?.attachmentLabel || '';
-      const generated = await generateMemeFromText(backendUrl, contextText);
+      let generated: GeneratedMeme;
+      if (fileAttachment) {
+        if (fileAttachment.type.startsWith('image/')) {
+          setHelper("Analyse de l'image par Gemini...");
+          generated = await generateMemeFromImage(backendUrl, {
+            uri: fileAttachment.uri,
+            name: fileAttachment.name,
+            type: fileAttachment.type,
+          });
+        } else if (fileAttachment.type.startsWith('audio/') || fileAttachment.mode === 'mic') {
+          setHelper("Transcription et génération depuis l'audio...");
+          generated = await generateMemeFromAudio(backendUrl, {
+            uri: fileAttachment.uri,
+            name: fileAttachment.name,
+            type: fileAttachment.type,
+          });
+        } else {
+          generated = await generateMemeFromText(backendUrl, text.trim() || fileAttachment.name);
+        }
+      } else {
+        generated = await generateMemeFromText(backendUrl, text.trim());
+      }
       setResult(generated);
       setHelper('Mème généré depuis le backend.');
     } catch (apiError) {
@@ -93,8 +245,9 @@ export function ContextScreen() {
 
       setError(`${message}. Résultat local temporaire affiché.`);
       setResult({
-        caption:
-          'Quand le backend dort encore, mais que le TP doit avancer quand même.',
+        caption: fileAttachment
+          ? `Quand tu envoies "${fileAttachment.name}" mais que l'API est hors ligne.`
+          : 'Quand le backend dort encore, mais que le TP doit avancer quand même.',
         tone: 'Fallback local',
       });
     } finally {
@@ -118,7 +271,7 @@ export function ContextScreen() {
             placeholder="Écris ou colle ton contexte..."
             value={text}
             maxLength={MAX_LENGTH}
-          onChangeText={value => {
+            onChangeText={value => {
               setText(value);
               setResult(null);
               setError(null);
@@ -127,31 +280,97 @@ export function ContextScreen() {
           />
 
           <View style={styles.inputActions}>
-            {inputActions.map(action => (
-              <Pressable
-                key={action.label}
-                accessibilityRole="button"
-                accessibilityLabel={action.label}
-                onPress={() => handleInputAction(action)}
-                style={({pressed}) => [
-                  styles.inputAction,
-                  {
-                    backgroundColor: colors.card,
-                    borderColor: colors.border,
-                  },
-                  pressed && styles.pressed,
-                ]}>
-                <IconSymbol
-                  name={action.icon}
-                  color={colors.text}
-                  size={action.icon === 'mic' ? 17 : 18}
-                />
-              </Pressable>
-            ))}
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Prendre une photo"
+              onPress={handleCamera}
+              style={({pressed}) => [
+                styles.inputAction,
+                {
+                  backgroundColor: colors.card,
+                  borderColor: colors.border,
+                },
+                pressed && styles.pressed,
+              ]}>
+              <IconSymbol
+                name="camera"
+                color={colors.text}
+                size={18}
+              />
+            </Pressable>
+
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={recording ? "Arrêter l'enregistrement" : "Enregistrer de l'audio"}
+              onPress={handleMicToggle}
+              style={({pressed}) => [
+                styles.inputAction,
+                {
+                  backgroundColor: recording ? colors.danger : colors.card,
+                  borderColor: colors.border,
+                },
+                pressed && styles.pressed,
+              ]}>
+              <IconSymbol
+                name="mic"
+                color={recording ? "#FFFFFF" : colors.text}
+                size={17}
+              />
+            </Pressable>
+
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Importer un fichier"
+              onPress={handleImport}
+              style={({pressed}) => [
+                styles.inputAction,
+                {
+                  backgroundColor: colors.card,
+                  borderColor: colors.border,
+                },
+                pressed && styles.pressed,
+              ]}>
+              <IconSymbol
+                name="import"
+                color={colors.text}
+                size={18}
+              />
+            </Pressable>
           </View>
         </View>
 
-        {attachment ? (
+        {recording ? (
+          <View
+            style={[
+              styles.attachmentBar,
+              {backgroundColor: colors.card, borderColor: colors.danger},
+            ]}>
+            <View style={styles.attachmentCopy}>
+              <View style={styles.redDot} />
+              <View style={styles.attachmentTextWrap}>
+                <Text style={[styles.attachmentTitle, {color: colors.text}]}>
+                  Enregistrement vocal en cours...
+                </Text>
+                <Text style={[styles.attachmentText, {color: colors.textMuted}]}>
+                  Durée : {recordTime}
+                </Text>
+              </View>
+            </View>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Arrêter"
+              onPress={handleMicToggle}
+              style={({pressed}) => [
+                styles.clearAttachment,
+                {backgroundColor: colors.danger},
+                pressed && styles.pressed,
+              ]}>
+              <IconSymbol name="close" color="#FFFFFF" size={16} />
+            </Pressable>
+          </View>
+        ) : undefined}
+
+        {fileAttachment ? (
           <View
             style={[
               styles.attachmentBar,
@@ -159,23 +378,23 @@ export function ContextScreen() {
             ]}>
             <View style={styles.attachmentCopy}>
               <IconSymbol
-                name={attachment.icon}
+                name={fileAttachment.mode === 'camera' ? 'camera' : fileAttachment.mode === 'mic' ? 'mic' : 'import'}
                 color={colors.info}
                 size={18}
               />
               <View style={styles.attachmentTextWrap}>
                 <Text style={[styles.attachmentTitle, {color: colors.text}]}>
-                  {attachment.attachmentLabel}
+                  {fileAttachment.name}
                 </Text>
                 <Text style={[styles.attachmentText, {color: colors.textMuted}]}>
-                  Simulation UI prête pour branchement natif
+                  {fileAttachment.type || 'Fichier prêt'}
                 </Text>
               </View>
             </View>
             <Pressable
               accessibilityRole="button"
               accessibilityLabel="Retirer l'import"
-              onPress={() => setAttachment(null)}
+              onPress={() => setFileAttachment(null)}
               style={({pressed}) => [
                 styles.clearAttachment,
                 {backgroundColor: colors.input},
@@ -297,6 +516,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: spacing.md,
+  },
+  redDot: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: '#FF3B30',
   },
   attachmentCopy: {
     flex: 1,

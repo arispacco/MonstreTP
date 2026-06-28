@@ -1,58 +1,163 @@
-import React, {useState} from 'react';
-import {Pressable, StyleSheet, Text, View} from 'react-native';
+import React, {useState, useEffect, useRef} from 'react';
+import {
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+  TextInput,
+  Image,
+  PanResponder,
+  Share,
+  ScrollView,
+  Alert,
+} from 'react-native';
+import LinearGradient from 'react-native-linear-gradient';
 import {IconSymbol} from '../components/IconSymbol';
-import {shareMemeText} from '../services/share';
 import {useAppTheme} from '../theme/ThemeProvider';
 import {spacing, typography} from '../theme/theme';
+import {useRoute} from '@react-navigation/native';
+import {launchImageLibrary} from 'react-native-image-picker';
+import {captureRef} from 'react-native-view-shot';
 
 const tools = [
-  {icon: 'image' as const, title: 'Add', type: 'image'},
   {icon: 'text' as const, title: 'Text', type: 'text'},
   {icon: 'smile' as const, title: 'Emoji', type: 'emoji'},
   {icon: 'sticker' as const, title: 'Sticker', type: 'sticker'},
-  {icon: 'gif' as const, title: 'GIF Sticker', type: 'gif'},
-  {icon: 'background' as const, title: 'Background', type: 'background'},
+  {icon: 'image' as const, title: 'Image', type: 'image'},
+  {icon: 'background' as const, title: 'Fond', type: 'background'},
 ];
 
 type EditorLayer = {
   id: string;
-  type: string;
+  type: 'image' | 'text' | 'emoji' | 'sticker' | 'gif';
   label: string;
+  uri?: string;
   x: number;
   y: number;
+  scale: number;
+  rotation: number;
+  color?: string;
+  fontSize?: number;
 };
+
+const popularEmojis = ['😎', '😂', '😭', '😡', '😱', '🤔', '👍', '🔥', '👀', '💯', '💩', '🤡'];
+const popularStickers = ['APPROVED', 'MIND BLOWN', 'BRUH', 'HOLD UP', 'NANI', 'STKS ONLY'];
+const presetGradients = [
+  ['#FF512F', '#DD2476'], // Sunset
+  ['#1A2980', '#26D0CE'], // Ocean
+  ['#11998e', '#38ef7d'], // Neon Green
+  ['#833ab4', '#fd1d1d', '#fcb045'], // Purple Dream
+  ['#09090e', '#1c1c28'], // Dark Minimal
+];
 
 export function AtelierScreen() {
   const {colors} = useAppTheme();
+  const route = useRoute<any>();
+
   const [layers, setLayers] = useState<EditorLayer[]>([
-    {id: 'text-1', type: 'text', label: 'TON MEME ICI', x: 18, y: 18},
+    {
+      id: 'text-1',
+      type: 'text',
+      label: 'TON MÈME ICI',
+      x: 0,
+      y: -40,
+      scale: 1.2,
+      rotation: 0,
+      color: '#FFFFFF',
+      fontSize: 24,
+    },
   ]);
   const [selectedLayerId, setSelectedLayerId] = useState('text-1');
   const [backgroundIndex, setBackgroundIndex] = useState(0);
+  const [backgroundPalette, setBackgroundPalette] = useState<string[]>(['#FF512F', '#DD2476']);
+  const [backgroundImageUri, setBackgroundImageUri] = useState<string | null>(null);
+  
+  // Track active sub-tool panel in the toolbox
+  const [activeTool, setActiveTool] = useState<string | null>(null);
+  
+  const canvasRef = useRef<View>(null);
 
-  function addLayer(type: string) {
-    if (type === 'background') {
-      setBackgroundIndex(index => (index + 1) % 3);
-      return;
+  // Initialize with params from navigation
+  useEffect(() => {
+    if (route.params?.caption) {
+      const nextLayer: EditorLayer = {
+        id: `text-${Date.now()}`,
+        type: 'text',
+        label: route.params.caption,
+        x: 0,
+        y: 0,
+        scale: 1,
+        rotation: 0,
+        color: '#FFFFFF',
+        fontSize: 22,
+      };
+      setLayers([nextLayer]);
+      setSelectedLayerId(nextLayer.id);
+
+      if (route.params.palette) {
+        setBackgroundPalette(route.params.palette);
+        setBackgroundIndex(3);
+      } else {
+        setBackgroundIndex(0);
+      }
     }
+  }, [route.params]);
 
-    const labels: Record<string, string> = {
-      image: 'IMAGE',
-      text: 'NOUVEAU TEXTE',
+  function addLayer(type: 'image' | 'text' | 'emoji' | 'sticker' | 'gif', val?: string, uri?: string) {
+    const defaultLabels = {
+      image: 'Image',
+      text: 'TEXTE',
       emoji: '😎',
       sticker: 'STICKER',
       gif: 'GIF',
     };
-    const nextLayer = {
+
+    const nextLayer: EditorLayer = {
       id: `${type}-${Date.now()}`,
       type,
-      label: labels[type] ?? type.toUpperCase(),
-      x: 12 + (layers.length % 3) * 22,
-      y: 20 + (layers.length % 4) * 16,
+      label: val || defaultLabels[type],
+      uri,
+      x: (layers.length % 3) * 15,
+      y: (layers.length % 3) * 15,
+      scale: 1,
+      rotation: 0,
+      color: '#FFFFFF',
+      fontSize: type === 'emoji' ? 44 : 22,
     };
 
     setLayers(current => [...current, nextLayer]);
     setSelectedLayerId(nextLayer.id);
+  }
+
+  async function pickImageLayer() {
+    launchImageLibrary({mediaType: 'photo', quality: 0.8}, response => {
+      if (response.assets && response.assets.length > 0) {
+        const asset = response.assets[0];
+        if (asset.uri) {
+          addLayer('image', asset.fileName || 'Photo', asset.uri);
+        }
+      }
+    });
+  }
+
+  async function pickBackgroundImage() {
+    launchImageLibrary({mediaType: 'photo', quality: 0.8}, response => {
+      if (response.assets && response.assets.length > 0) {
+        const asset = response.assets[0];
+        if (asset.uri) {
+          setBackgroundImageUri(asset.uri);
+          setBackgroundIndex(4);
+        }
+      }
+    });
+  }
+
+  function updateSelectedLayer(updates: Partial<EditorLayer>) {
+    setLayers(current =>
+      current.map(layer =>
+        layer.id === selectedLayerId ? {...layer, ...updates} : layer,
+      ),
+    );
   }
 
   function deleteSelectedLayer() {
@@ -60,117 +165,306 @@ export function AtelierScreen() {
     setSelectedLayerId('');
   }
 
+  async function exportAndShareMeme() {
+    try {
+      if (!canvasRef.current) return;
+      const uri = await captureRef(canvasRef, {
+        format: 'png',
+        quality: 0.9,
+      });
+
+      await Share.share({
+        title: 'MemeAI',
+        url: uri,
+        message: 'Meme créé avec l’atelier MemeAI !',
+      });
+    } catch {
+      Alert.alert('Exportation échouée', 'Impossible de capturer le canvas.');
+    }
+  }
+
   const selectedLayer = layers.find(layer => layer.id === selectedLayerId);
 
   return (
     <View style={[styles.screen, {backgroundColor: colors.background}]}>
-      <View style={styles.canvasArea}>
-        <View
-          style={[
-            styles.checkerboard,
-            backgroundIndex === 1 ? styles.canvasWarm : undefined,
-            backgroundIndex === 2 ? styles.canvasCool : undefined,
-          ]}>
-          {Array.from({length: 240}).map((_, index) => (
-            <View
-              key={index}
-              style={[
-                styles.checkerCell,
-                (Math.floor(index / 12) + index) % 2 === 0
-                  ? styles.checkerCellA
-                  : styles.checkerCellB,
-              ]}
-            />
-          ))}
+      {/* Top Header */}
+      <View style={[styles.topHeader, {borderBottomColor: colors.border}]}>
+        <Text style={[styles.headerTitle, {color: colors.text}]}>Atelier</Text>
+        <View style={styles.headerActions}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Partager le mème"
+            onPress={exportAndShareMeme}
+            style={({pressed}) => [
+              styles.headerBtn,
+              {backgroundColor: colors.info},
+              pressed && styles.pressed,
+            ]}>
+            <IconSymbol name="share" color="#FFFFFF" size={18} />
+            <Text style={styles.headerBtnText}>Export</Text>
+          </Pressable>
         </View>
+      </View>
 
-        <View style={styles.canvasOverlay}>
+      {/* Canvas Area */}
+      <View style={styles.canvasContainer}>
+        <View
+          ref={canvasRef}
+          collapsable={false}
+          style={[styles.canvasArea, {borderColor: colors.border}]}>
+          
+          {/* Background Render */}
+          {backgroundIndex === 0 && (
+            <View style={styles.checkerboard}>
+              {Array.from({length: 120}).map((_, index) => (
+                <View
+                  key={index}
+                  style={[
+                    styles.checkerCell,
+                    (Math.floor(index / 10) + index) % 2 === 0
+                      ? styles.checkerCellA
+                      : styles.checkerCellB,
+                  ]}
+                />
+              ))}
+            </View>
+          )}
+
+          {backgroundIndex === 1 && (
+            <LinearGradient colors={presetGradients[0]} style={StyleSheet.absoluteFill} />
+          )}
+
+          {backgroundIndex === 2 && (
+            <LinearGradient colors={presetGradients[1]} style={StyleSheet.absoluteFill} />
+          )}
+
+          {backgroundIndex === 3 && (
+            <LinearGradient colors={backgroundPalette} style={StyleSheet.absoluteFill} />
+          )}
+
+          {backgroundIndex === 4 && backgroundImageUri && (
+            <Image source={{uri: backgroundImageUri}} style={StyleSheet.absoluteFill} resizeMode="cover" />
+          )}
+
+          {/* Render Layers */}
           {layers.length === 0 ? (
-            <>
+            <View style={styles.canvasPlaceholderContainer}>
               <Text style={styles.canvasPlaceholder}>Atelier MemeAI</Text>
               <Text style={styles.canvasHint}>
-                Ajoute une image, du texte ou un sticker pour commencer.
+                Ajoute du texte, un emoji ou une image pour commencer.
               </Text>
-            </>
+            </View>
           ) : (
             layers.map(layer => (
-              <EditorLayerView
+              <DraggableLayer
                 key={layer.id}
                 layer={layer}
                 selected={selectedLayerId === layer.id}
-                selectedColor={colors.info}
-                onPress={() => setSelectedLayerId(layer.id)}
+                colors={colors}
+                onSelect={() => setSelectedLayerId(layer.id)}
+                onUpdate={updateSelectedLayer}
               />
             ))
           )}
         </View>
       </View>
 
-      <View style={[styles.toolbox, {backgroundColor: colors.card}]}>
+      {/* Toolbox Panel */}
+      <View style={[styles.toolbox, {backgroundColor: colors.card, borderTopColor: colors.border}]}>
         <View style={styles.dragHandle} />
-        <View style={styles.toolGrid}>
-          {tools.map(tool => (
-            <Pressable
-              key={tool.title}
-              accessibilityRole="button"
-              accessibilityLabel={tool.title}
-              onPress={() => addLayer(tool.type)}
-              style={({pressed}) => [
-                styles.toolButton,
-                pressed && styles.pressed,
-              ]}>
-              <View
-                style={[
-                  styles.toolIconBox,
-                  {borderColor: colors.borderMuted},
-                ]}>
-                <IconSymbol
-                  name={tool.icon}
-                  color={colors.text}
-                  size={tool.title === 'GIF Sticker' ? 21 : 30}
+        
+        {/* Dynamic Tool Content */}
+        {activeTool === 'text' && selectedLayer?.type === 'text' && (
+          <View style={styles.toolSubPanel}>
+            <View style={styles.subPanelHeader}>
+              <Text style={[styles.subPanelTitle, {color: colors.text}]}>Modifier le Texte</Text>
+              <Pressable onPress={() => setActiveTool(null)}>
+                <IconSymbol name="close" color={colors.text} size={18} />
+              </Pressable>
+            </View>
+            <TextInput
+              value={selectedLayer.label}
+              onChangeText={val => updateSelectedLayer({label: val})}
+              style={[styles.textInput, {backgroundColor: colors.input, borderColor: colors.border, color: colors.text}]}
+              placeholder="Écris ton texte..."
+              placeholderTextColor={colors.placeholder}
+            />
+            {/* Color Selectors */}
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.colorRow}>
+              {['#FFFFFF', '#000000', '#FFCC00', '#FF3B30', '#4CD964', '#007AFF', '#FF2D55'].map(c => (
+                <Pressable
+                  key={c}
+                  onPress={() => updateSelectedLayer({color: c})}
+                  style={[
+                    styles.colorOption,
+                    {backgroundColor: c, borderColor: selectedLayer.color === c ? colors.info : 'transparent'},
+                  ]}
                 />
-              </View>
-              <Text style={[styles.toolTitle, {color: colors.text}]}>
-                {tool.title}
-              </Text>
-            </Pressable>
-          ))}
-        </View>
+              ))}
+            </ScrollView>
+          </View>
+        )}
 
+        {activeTool === 'emoji' && (
+          <View style={styles.toolSubPanel}>
+            <View style={styles.subPanelHeader}>
+              <Text style={[styles.subPanelTitle, {color: colors.text}]}>Ajouter un Emoji</Text>
+              <Pressable onPress={() => setActiveTool(null)}>
+                <IconSymbol name="close" color={colors.text} size={18} />
+              </Pressable>
+            </View>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.emojiList}>
+              {popularEmojis.map(emo => (
+                <Pressable key={emo} onPress={() => addLayer('emoji', emo)} style={styles.emojiItem}>
+                  <Text style={styles.emojiItemText}>{emo}</Text>
+                </Pressable>
+              ))}
+            </ScrollView>
+          </View>
+        )}
+
+        {activeTool === 'sticker' && (
+          <View style={styles.toolSubPanel}>
+            <View style={styles.subPanelHeader}>
+              <Text style={[styles.subPanelTitle, {color: colors.text}]}>Ajouter un Sticker</Text>
+              <Pressable onPress={() => setActiveTool(null)}>
+                <IconSymbol name="close" color={colors.text} size={18} />
+              </Pressable>
+            </View>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.emojiList}>
+              {popularStickers.map(stk => (
+                <Pressable key={stk} onPress={() => addLayer('sticker', stk)} style={[styles.stickerItem, {backgroundColor: colors.input}]}>
+                  <Text style={[styles.stickerItemText, {color: colors.text}]}>{stk}</Text>
+                </Pressable>
+              ))}
+            </ScrollView>
+          </View>
+        )}
+
+        {activeTool === 'background' && (
+          <View style={styles.toolSubPanel}>
+            <View style={styles.subPanelHeader}>
+              <Text style={[styles.subPanelTitle, {color: colors.text}]}>Fond d'écran</Text>
+              <Pressable onPress={() => setActiveTool(null)}>
+                <IconSymbol name="close" color={colors.text} size={18} />
+              </Pressable>
+            </View>
+            <View style={styles.bgOptions}>
+              <Pressable onPress={() => setBackgroundIndex(0)} style={[styles.bgOptionBtn, {backgroundColor: colors.input}]}>
+                <Text style={{color: colors.text, fontSize: 13}}>Quadrillé</Text>
+              </Pressable>
+              <Pressable onPress={() => setBackgroundIndex(1)} style={[styles.bgOptionBtn, {backgroundColor: colors.input}]}>
+                <Text style={{color: colors.text, fontSize: 13}}>Sunset</Text>
+              </Pressable>
+              <Pressable onPress={() => setBackgroundIndex(2)} style={[styles.bgOptionBtn, {backgroundColor: colors.input}]}>
+                <Text style={{color: colors.text, fontSize: 13}}>Ocean</Text>
+              </Pressable>
+              <Pressable onPress={pickBackgroundImage} style={[styles.bgOptionBtn, {backgroundColor: colors.info}]}>
+                <Text style={{color: '#FFFFFF', fontSize: 13}}>Importer Image</Text>
+              </Pressable>
+            </View>
+          </View>
+        )}
+
+        {/* Selected Layer Controls (Rot/Scale) */}
+        {selectedLayer && !activeTool && (
+          <View style={styles.adjustPanel}>
+            <View style={styles.subPanelHeader}>
+              <Text style={[styles.subPanelTitle, {color: colors.text}]}>
+                Ajuster : {selectedLayer.type.toUpperCase()}
+              </Text>
+              {selectedLayer.type === 'text' && (
+                <Pressable onPress={() => setActiveTool('text')} style={[styles.editPill, {backgroundColor: colors.input}]}>
+                  <Text style={{color: colors.text, fontSize: 12}}>Modifier Texte</Text>
+                </Pressable>
+              )}
+            </View>
+            <View style={styles.rangeRow}>
+              <RangeAdjuster
+                label="Taille"
+                value={selectedLayer.scale}
+                min={0.4}
+                max={3.5}
+                step={0.15}
+                onChange={val => updateSelectedLayer({scale: val})}
+                colors={colors}
+              />
+              <RangeAdjuster
+                label="Rotation"
+                value={selectedLayer.rotation}
+                min={-180}
+                max={180}
+                step={10}
+                onChange={val => updateSelectedLayer({rotation: val})}
+                colors={colors}
+              />
+            </View>
+          </View>
+        )}
+
+        {/* Main Toolbar Tabs */}
+        {!activeTool && (
+          <View style={styles.toolTabs}>
+            {tools.map(tool => (
+              <Pressable
+                key={tool.title}
+                accessibilityRole="button"
+                accessibilityLabel={tool.title}
+                onPress={() => {
+                  if (tool.type === 'image') {
+                    pickImageLayer();
+                  } else {
+                    setActiveTool(tool.type);
+                  }
+                }}
+                style={({pressed}) => [styles.toolTabButton, pressed && styles.pressed]}>
+                <View style={[styles.tabIconBox, {backgroundColor: colors.input}]}>
+                  <IconSymbol name={tool.icon} color={colors.text} size={22} />
+                </View>
+                <Text style={[styles.tabTitle, {color: colors.text}]}>{tool.title}</Text>
+              </Pressable>
+            ))}
+          </View>
+        )}
+
+        {/* Status Bar Controls */}
         <View style={[styles.statusBar, {borderTopColor: colors.border}]}>
-          <View>
-            <Text style={[styles.statusTitle, {color: colors.text}]}>
+          <View style={styles.statusLabelWrap}>
+            <Text style={[styles.statusTitle, {color: colors.text}]} numberOfLines={1}>
               {selectedLayer ? selectedLayer.label : 'Nouveau mème'}
             </Text>
             <Text style={[styles.statusText, {color: colors.textMuted}]}>
-              {selectedLayer
-                ? 'Tap sur un outil pour ajouter un calque.'
-                : 'Canvas libre, ajoute un premier élément.'}
+              {selectedLayer ? 'Faites glisser pour déplacer' : 'Sélectionnez un élément'}
             </Text>
           </View>
           <View style={styles.statusActions}>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Supprimer le calque"
-              onPress={deleteSelectedLayer}
-              style={({pressed}) => [
-                styles.savePill,
-                {backgroundColor: colors.input},
-                pressed && styles.pressed,
-              ]}>
-              <Text style={[styles.saveText, {color: colors.text}]}>Delete</Text>
-            </Pressable>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Partager le mème"
-              onPress={() => shareMemeText('Mème créé dans l’atelier MemeAI')}
-              style={({pressed}) => [
-                styles.savePill,
-                {backgroundColor: colors.info},
-                pressed && styles.pressed,
-              ]}>
-              <Text style={styles.saveText}>Save</Text>
-            </Pressable>
+            {selectedLayer ? (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Supprimer le calque"
+                onPress={deleteSelectedLayer}
+                style={({pressed}) => [
+                  styles.actionPill,
+                  {backgroundColor: colors.danger},
+                  pressed && styles.pressed,
+                ]}>
+                <IconSymbol name="close" color="#FFFFFF" size={16} />
+                <Text style={styles.actionPillText}>Suppr.</Text>
+              </Pressable>
+            ) : (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Ajouter du texte"
+                onPress={() => addLayer('text')}
+                style={({pressed}) => [
+                  styles.actionPill,
+                  {backgroundColor: colors.info},
+                  pressed && styles.pressed,
+                ]}>
+                <IconSymbol name="import" color="#FFFFFF" size={16} />
+                <Text style={styles.actionPillText}>Texte</Text>
+              </Pressable>
+            )}
           </View>
         </View>
       </View>
@@ -178,44 +472,105 @@ export function AtelierScreen() {
   );
 }
 
-function EditorLayerView({
+function DraggableLayer({
   layer,
   selected,
-  selectedColor,
-  onPress,
+  colors,
+  onSelect,
+  onUpdate,
 }: {
   layer: EditorLayer;
   selected: boolean;
-  selectedColor: string;
-  onPress: () => void;
+  colors: any;
+  onSelect: () => void;
+  onUpdate: (updated: Partial<EditorLayer>) => void;
 }) {
-  const dynamicStyles = StyleSheet.create({
-    layer: {
-      left: `${layer.x}%`,
-      top: `${layer.y}%`,
-      borderColor: selected ? selectedColor : 'transparent',
-    },
-  });
+  const startPos = useRef({x: 0, y: 0});
+
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onPanResponderGrant: () => {
+        onSelect();
+        startPos.current = {x: layer.x, y: layer.y};
+      },
+      onPanResponderMove: (evt, gestureState) => {
+        onUpdate({
+          x: startPos.current.x + gestureState.dx,
+          y: startPos.current.y + gestureState.dy,
+        });
+      },
+    }),
+  ).current;
 
   return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={`Calque ${layer.label}`}
-      onPress={onPress}
+    <View
+      {...panResponder.panHandlers}
       style={[
-        styles.layer,
-        dynamicStyles.layer,
-        layer.type === 'image' ? styles.imageLayer : undefined,
-        layer.type === 'emoji' ? styles.emojiLayer : undefined,
+        styles.layerContainer,
+        {
+          transform: [
+            {translateX: layer.x},
+            {translateY: layer.y},
+            {scale: layer.scale},
+            {rotate: `${layer.rotation}deg`},
+          ],
+          borderColor: selected ? colors.info : 'transparent',
+          borderWidth: selected ? 2 : 0,
+        },
       ]}>
-      <Text
-        style={[
-          styles.layerText,
-          layer.type === 'emoji' ? styles.emojiText : undefined,
-        ]}>
-        {layer.label}
-      </Text>
-    </Pressable>
+      {layer.type === 'image' && layer.uri ? (
+        <Image source={{uri: layer.uri}} style={styles.layerImage} />
+      ) : (
+        <Text
+          style={[
+            styles.layerText,
+            {
+              color: layer.color || '#FFFFFF',
+              fontSize: layer.fontSize || 22,
+            },
+          ]}>
+          {layer.label}
+        </Text>
+      )}
+    </View>
+  );
+}
+
+function RangeAdjuster({
+  label,
+  value,
+  min,
+  max,
+  step,
+  onChange,
+  colors,
+}: {
+  label: string;
+  value: number;
+  min: number;
+  max: number;
+  step: number;
+  onChange: (val: number) => void;
+  colors: any;
+}) {
+  return (
+    <View style={styles.adjusterRow}>
+      <Text style={[styles.adjusterLabel, {color: colors.textMuted}]}>{label}</Text>
+      <View style={styles.adjusterControls}>
+        <Pressable
+          onPress={() => onChange(Math.max(min, value - step))}
+          style={({pressed}) => [styles.adjusterBtn, {backgroundColor: colors.input}, pressed && styles.pressed]}>
+          <Text style={[styles.adjusterBtnText, {color: colors.text}]}>-</Text>
+        </Pressable>
+        <Text style={[styles.adjusterValue, {color: colors.text}]}>{value.toFixed(1)}</Text>
+        <Pressable
+          onPress={() => onChange(Math.min(max, value + step))}
+          style={({pressed}) => [styles.adjusterBtn, {backgroundColor: colors.input}, pressed && styles.pressed]}>
+          <Text style={[styles.adjusterBtnText, {color: colors.text}]}>+</Text>
+        </Pressable>
+      </View>
+    </View>
   );
 }
 
@@ -223,48 +578,80 @@ const styles = StyleSheet.create({
   screen: {
     flex: 1,
   },
-  canvasArea: {
+  topHeader: {
+    height: 60,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: spacing.xl,
+    borderBottomWidth: 1,
+  },
+  headerTitle: {
+    ...typography.h2,
+  },
+  headerActions: {
+    flexDirection: 'row',
+    gap: spacing.md,
+  },
+  headerBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingHorizontal: spacing.lg,
+    height: 36,
+    borderRadius: 18,
+  },
+  headerBtnText: {
+    ...typography.label,
+    color: '#FFFFFF',
+    fontSize: 13,
+  },
+  canvasContainer: {
     flex: 1,
-    minHeight: 240,
+    padding: spacing.lg,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  canvasArea: {
+    width: '100%',
+    aspectRatio: 1,
+    borderWidth: 1,
+    borderRadius: 16,
     overflow: 'hidden',
+    position: 'relative',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#000000',
   },
   checkerboard: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     width: '100%',
     height: '100%',
+    position: 'absolute',
   },
   checkerCell: {
-    width: `${100 / 12}%`,
+    width: '10%',
     aspectRatio: 1,
   },
   checkerCellA: {
-    backgroundColor: '#343438',
+    backgroundColor: '#1E1E24',
   },
   checkerCellB: {
-    backgroundColor: '#2C2C30',
+    backgroundColor: '#15151A',
   },
-  canvasWarm: {
-    backgroundColor: '#4A2C33',
-  },
-  canvasCool: {
-    backgroundColor: '#1D3944',
-  },
-  canvasOverlay: {
-    ...StyleSheet.absoluteFill,
+  canvasPlaceholderContainer: {
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: spacing.xxxl,
+    padding: spacing.xxl,
   },
   canvasPlaceholder: {
     color: '#FFFFFF',
-    fontSize: 28,
-    lineHeight: 36,
+    fontSize: 26,
     fontWeight: '900',
     textAlign: 'center',
     textShadowColor: '#000000',
-    textShadowRadius: 8,
-    textShadowOffset: {width: 1, height: 1},
+    textShadowRadius: 6,
   },
   canvasHint: {
     ...typography.caption,
@@ -272,110 +659,202 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: spacing.sm,
   },
-  layer: {
+  layerContainer: {
     position: 'absolute',
-    borderWidth: 2,
-    borderRadius: 10,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    backgroundColor: 'rgba(0,0,0,0.28)',
-  },
-  imageLayer: {
-    width: 120,
-    height: 90,
+    padding: spacing.md,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(255,255,255,0.2)',
+    borderRadius: 8,
   },
-  emojiLayer: {
-    backgroundColor: 'transparent',
+  layerImage: {
+    width: 140,
+    height: 100,
+    resizeMode: 'contain',
   },
   layerText: {
-    color: '#FFFFFF',
-    fontSize: 22,
-    lineHeight: 28,
     fontWeight: '900',
-    textShadowColor: '#000000',
-    textShadowRadius: 5,
-    textShadowOffset: {width: 1, height: 1},
     textAlign: 'center',
-  },
-  emojiText: {
-    fontSize: 42,
-    lineHeight: 48,
+    textShadowColor: '#000000',
+    textShadowRadius: 6,
+    textShadowOffset: {width: 1, height: 1},
   },
   toolbox: {
-    minHeight: 330,
-    paddingHorizontal: spacing.xl,
-    paddingTop: spacing.md,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    borderTopWidth: 1,
     paddingBottom: spacing.xl,
-    borderTopLeftRadius: 0,
-    borderTopRightRadius: 0,
+    paddingHorizontal: spacing.xl,
   },
   dragHandle: {
-    width: 44,
+    width: 40,
     height: 4,
+    backgroundColor: '#4E4E5A',
     borderRadius: 2,
-    backgroundColor: '#4B4B55',
     alignSelf: 'center',
-    marginBottom: spacing.xl,
+    marginVertical: spacing.md,
   },
-  toolGrid: {
+  toolTabs: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    rowGap: spacing.xxl,
+    justifyContent: 'space-between',
+    marginVertical: spacing.md,
   },
-  toolButton: {
-    width: '33.333%',
-    minHeight: 90,
+  toolTabButton: {
+    alignItems: 'center',
+    flex: 1,
+  },
+  tabIconBox: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
     alignItems: 'center',
     justifyContent: 'center',
+    marginBottom: spacing.xs,
   },
-  toolIconBox: {
-    width: 58,
-    height: 58,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  toolTitle: {
-    ...typography.label,
-    fontSize: 16,
-    marginTop: spacing.md,
-    textAlign: 'center',
-  },
-  pressed: {
-    opacity: 0.7,
-    transform: [{scale: 0.97}],
+  tabTitle: {
+    ...typography.caption,
+    fontSize: 12,
   },
   statusBar: {
-    marginTop: spacing.xxl,
-    paddingTop: spacing.lg,
-    borderTopWidth: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    gap: spacing.lg,
+    paddingTop: spacing.lg,
+    borderTopWidth: 1,
+    marginTop: spacing.md,
+  },
+  statusLabelWrap: {
+    flex: 1,
   },
   statusTitle: {
-    ...typography.h3,
+    ...typography.label,
+    fontSize: 14,
   },
   statusText: {
     ...typography.caption,
-    marginTop: 2,
+    fontSize: 11,
   },
-  savePill: {
-    minHeight: 40,
-    borderRadius: 20,
-    paddingHorizontal: spacing.xl,
+  actionPill: {
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+    gap: spacing.sm,
+    paddingHorizontal: spacing.lg,
+    height: 36,
+    borderRadius: 18,
+  },
+  actionPillText: {
+    ...typography.label,
+    color: '#FFFFFF',
+    fontSize: 12,
   },
   statusActions: {
     flexDirection: 'row',
     gap: spacing.sm,
   },
-  saveText: {
+  toolSubPanel: {
+    paddingVertical: spacing.md,
+    gap: spacing.md,
+  },
+  subPanelHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  subPanelTitle: {
     ...typography.label,
-    color: '#FFFFFF',
+    fontSize: 14,
+  },
+  textInput: {
+    borderWidth: 1,
+    borderRadius: 12,
+    height: 46,
+    paddingHorizontal: spacing.lg,
+    fontSize: 15,
+  },
+  colorRow: {
+    gap: spacing.md,
+    paddingVertical: spacing.xs,
+  },
+  colorOption: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    borderWidth: 2,
+  },
+  emojiList: {
+    gap: spacing.md,
+  },
+  emojiItem: {
+    padding: spacing.md,
+  },
+  emojiItemText: {
+    fontSize: 32,
+  },
+  stickerItem: {
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    borderRadius: 12,
+  },
+  stickerItemText: {
+    fontWeight: '800',
+    fontSize: 14,
+  },
+  bgOptions: {
+    flexDirection: 'row',
+    gap: spacing.md,
+  },
+  bgOptionBtn: {
+    flex: 1,
+    height: 40,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  adjustPanel: {
+    paddingVertical: spacing.md,
+  },
+  editPill: {
+    paddingHorizontal: spacing.lg,
+    height: 28,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  rangeRow: {
+    flexDirection: 'row',
+    gap: spacing.xl,
+    marginTop: spacing.md,
+  },
+  adjusterRow: {
+    flex: 1,
+    gap: spacing.sm,
+  },
+  adjusterLabel: {
+    ...typography.caption,
+    fontSize: 12,
+  },
+  adjusterControls: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+  },
+  adjusterBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  adjusterBtnText: {
+    fontWeight: 'bold',
+    fontSize: 16,
+  },
+  adjusterValue: {
+    fontSize: 14,
+    fontWeight: '600',
+    minWidth: 24,
+    textAlign: 'center',
+  },
+  pressed: {
+    opacity: 0.8,
   },
 });

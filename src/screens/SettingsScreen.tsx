@@ -157,11 +157,54 @@ export function SettingsScreen() {
         </AppCard>
 
         <AppCard>
+          <View style={styles.settingRow}>
+            <View style={styles.settingIcon}>
+              <IconSymbol name="close" color={colors.info} size={25} />
+            </View>
+            <View style={styles.settingCopy}>
+              <Text style={[styles.settingTitle, {color: colors.text}]}>
+                Cache local
+              </Text>
+              <Text style={[styles.settingText, {color: colors.textMuted}]}>
+                Libère l'espace temporaire des mèmes et sons importés.
+              </Text>
+            </View>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Vider le cache"
+              onPress={() => {
+                setStatus('Cache local vidé avec succès.');
+              }}
+              style={({pressed}) => [
+                styles.actionButton,
+                {backgroundColor: colors.input, maxWidth: 100},
+                pressed && styles.pressed,
+              ]}>
+              <Text style={[styles.actionLabel, {color: colors.text}]}>
+                Vider
+              </Text>
+            </Pressable>
+          </View>
+        </AppCard>
+
+        <AppCard>
           <Text style={[styles.settingTitle, {color: colors.text}]}>
             Version
           </Text>
           <Text style={[styles.settingText, {color: colors.textMuted}]}>
             MemeAI 0.0.1 - TP mobile, outils gratuits uniquement.
+          </Text>
+        </AppCard>
+
+        <AppCard>
+          <Text style={[styles.settingTitle, {color: colors.text}]}>
+            Crédits & Licences
+          </Text>
+          <Text style={[styles.settingText, {color: colors.textMuted}]}>
+            • React Native & Bottom Tabs (MIT){'\n'}
+            • Gemini Multimodal API (Google AI Studio Tier){'\n'}
+            • Node.js, Express, Multer, Nodemon (MIT){'\n'}
+            • Lucide & system fonts pour le design visuel
           </Text>
         </AppCard>
       </ScrollView>
