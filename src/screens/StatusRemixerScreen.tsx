@@ -29,6 +29,7 @@ import {
 } from '../components/StatusGrid';
 import {colors, radii, spacing, typography} from '../theme/theme';
 import {useAppConfig} from '../config/AppConfigProvider';
+import {useAppTheme} from '../theme/ThemeProvider';
 import {generateMemeFromImage} from '../services/api';
 
 export function StatusRemixerScreen() {
