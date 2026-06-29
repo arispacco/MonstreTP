@@ -1,6 +1,8 @@
 import React, {useEffect, useState} from 'react';
 import {
+  Alert,
   ImageBackground,
+  Linking,
   Modal,
   PermissionsAndroid,
   Platform,
@@ -66,16 +68,23 @@ export function StatusRemixerScreen() {
     try {
       let granted = false;
       const sdkVer = typeof Platform.Version === 'string' ? parseInt(Platform.Version, 10) : Platform.Version;
-      if (sdkVer >= 33) {
-        const results = await PermissionsAndroid.requestMultiple([
-          PermissionsAndroid.PERMISSIONS.READ_MEDIA_IMAGES,
-          PermissionsAndroid.PERMISSIONS.READ_MEDIA_VIDEO,
-        ]);
-        granted =
-          results[PermissionsAndroid.PERMISSIONS.READ_MEDIA_IMAGES] ===
-            PermissionsAndroid.RESULTS.GRANTED &&
-          results[PermissionsAndroid.PERMISSIONS.READ_MEDIA_VIDEO] ===
-            PermissionsAndroid.RESULTS.GRANTED;
+      if (sdkVer >= 30) {
+        Alert.alert(
+          'Accès aux Statuts',
+          'Pour lire les statuts WhatsApp sur Android 11+, MemeAI a besoin d\'un accès complet aux fichiers.\n\nDans les paramètres, cherchez "MemeAI" puis activez "Accès à tous les fichiers".',
+          [
+            {
+              text: 'Ouvrir Paramètres',
+              onPress: () => {
+                Linking.openSettings();
+                // Optimistically attempt to load them later
+                setTimeout(() => setPermissionGranted(true), 2000);
+              }
+            },
+            { text: 'Annuler', style: 'cancel' }
+          ]
+        );
+        return;
       } else {
         const result = await PermissionsAndroid.request(
           PermissionsAndroid.PERMISSIONS.READ_EXTERNAL_STORAGE,
