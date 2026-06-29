@@ -133,7 +133,7 @@ def main():
     print(f"Run Link: {run_url}")
     
     # 4. Monitor the run
-    timeout_minutes = 7
+    timeout_minutes = 15
     poll_interval_seconds = 15
     start_time = time.time()
     
