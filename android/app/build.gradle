@@ -93,12 +93,12 @@ android {
             keyPassword 'android'
         }
         release {
-            if (project.hasProperty('MEMEAI_UPLOAD_STORE_FILE')) {
+            if (project.hasProperty('MEMEAI_UPLOAD_STORE_FILE') && file(project.getProperty('MEMEAI_UPLOAD_STORE_FILE')).exists()) {
                 storeFile file(MEMEAI_UPLOAD_STORE_FILE)
                 storePassword MEMEAI_UPLOAD_STORE_PASSWORD
                 keyAlias MEMEAI_UPLOAD_KEY_ALIAS
                 keyPassword MEMEAI_UPLOAD_KEY_PASSWORD
-            } else if (System.getenv('MEMEAI_UPLOAD_STORE_FILE')) {
+            } else if (System.getenv('MEMEAI_UPLOAD_STORE_FILE') && file(System.getenv('MEMEAI_UPLOAD_STORE_FILE')).exists()) {
                 storeFile file(System.getenv('MEMEAI_UPLOAD_STORE_FILE'))
                 storePassword System.getenv('MEMEAI_UPLOAD_STORE_PASSWORD')
                 keyAlias System.getenv('MEMEAI_UPLOAD_KEY_ALIAS')
