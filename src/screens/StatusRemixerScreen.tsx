@@ -1,4 +1,5 @@
 import React, {useEffect, useState} from 'react';
+import {useNavigation} from '@react-navigation/native';
 import {
   Alert,
   ImageBackground,
@@ -31,7 +32,8 @@ import {useAppConfig} from '../config/AppConfigProvider';
 import {generateMemeFromImage} from '../services/api';
 
 export function StatusRemixerScreen() {
-  const {backendUrl} = useAppConfig();
+  const {colors, backendUrl} = useAppTheme();
+  const navigation = useNavigation<any>();
   const [permissionGranted, setPermissionGranted] = useState(false);
   const [statuses, setStatuses] = useState<StatusItem[]>([]);
   const [selected, setSelected] = useState<StatusItem | null>(null);
@@ -358,6 +360,20 @@ export function StatusRemixerScreen() {
                   loading={loading}
                   onPress={generateCaption}
                   icon={<IconSymbol name="zap" color={colors.text} size={18} />}
+                />
+
+                <GradientButton
+                  label="Remixer dans l'Atelier"
+                  style={{marginTop: spacing.md}}
+                  onPress={() => {
+                    const imgUri = selected.uri && !selected.uri.includes('undefined') ? selected.uri : placeholderUri;
+                    setSelected(null);
+                    navigation.navigate('Atelier', {
+                      imageUri: imgUri,
+                      caption: caption || "Mon statut WhatsApp",
+                    });
+                  }}
+                  icon={<IconSymbol name="atelier" color={colors.text} size={18} />}
                 />
 
                 <View style={styles.sheetActions}>
