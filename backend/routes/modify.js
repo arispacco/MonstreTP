@@ -1,13 +1,17 @@
 const express = require('express');
 const multer = require('multer');
 const {cleanupFile, uploadImage} = require('../services/uploads');
-const {generatePromptForModifiedImage} = require('../services/gemini');
+const {generatePromptForModifiedImage, generatePromptForFaceSwap} = require('../services/gemini');
 
 const router = express.Router();
-const singleImage = multer(uploadImage).single('image');
+// Accept two separate fields for the fusion feature
+const uploadFields = multer(uploadImage).fields([
+  {name: 'image', maxCount: 1},
+  {name: 'subjectImage', maxCount: 1},
+]);
 
 router.post('/', (req, res, next) => {
-  singleImage(req, res, async error => {
+  uploadFields(req, res, async error => {
     if (error) {
       if (error.code === 'LIMIT_FILE_SIZE') {
         return res.status(413).json({
@@ -24,27 +28,40 @@ router.post('/', (req, res, next) => {
 
     const prompt = typeof req.body.prompt === 'string' ? req.body.prompt.trim() : '';
     const imageUrl = typeof req.body.imageUrl === 'string' ? req.body.imageUrl.trim() : '';
+    const subjectImageUrl = typeof req.body.subjectImageUrl === 'string' ? req.body.subjectImageUrl.trim() : '';
 
-    if (!prompt) {
-      if (req.file) cleanupFile(req.file.path);
-      return res.status(400).json({error: 'La consigne de modification (prompt) est obligatoire.'});
+    // File references from upload
+    const file1 = req.files && req.files.image ? req.files.image[0] : null;
+    const file2 = req.files && req.files.subjectImage ? req.files.subjectImage[0] : null;
+
+    // We need at least the main image (file or URL)
+    if (!file1 && !imageUrl) {
+      if (file2) cleanupFile(file2.path);
+      return res.status(400).json({error: 'Une image d’origine (fichier ou URL) est obligatoire.'});
     }
 
-    if (!req.file && !imageUrl) {
-      return res.status(400).json({error: 'Une image (fichier ou URL) est obligatoire.'});
-    }
-
-    const imageSource = req.file ? req.file.path : imageUrl;
+    const image1Source = file1 ? file1.path : imageUrl;
+    const image2Source = file2 ? file2.path : subjectImageUrl;
 
     try {
-      const revisedPrompt = await generatePromptForModifiedImage(imageSource, prompt);
-      res.json({prompt: revisedPrompt});
+      if (image1Source && image2Source) {
+        // Face swap / fusion case
+        const revisedPrompt = await generatePromptForFaceSwap(image1Source, image2Source);
+        res.json({prompt: revisedPrompt});
+      } else {
+        // Standard modification case
+        if (!prompt) {
+          if (file1) cleanupFile(file1.path);
+          return res.status(400).json({error: 'La consigne de modification (prompt) est obligatoire.'});
+        }
+        const revisedPrompt = await generatePromptForModifiedImage(image1Source, prompt);
+        res.json({prompt: revisedPrompt});
+      }
     } catch (err) {
       next(err);
     } finally {
-      if (req.file) {
-        cleanupFile(req.file.path);
-      }
+      if (file1) cleanupFile(file1.path);
+      if (file2) cleanupFile(file2.path);
     }
   });
 });

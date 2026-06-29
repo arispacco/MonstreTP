@@ -27,6 +27,7 @@ const iconMap = {
   sticker: '◰',
   gif: 'GIF',
   background: '▥',
+  face: '☺',
 } as const;
 
 export type IconName = keyof typeof iconMap;

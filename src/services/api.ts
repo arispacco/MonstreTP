@@ -80,15 +80,25 @@ export async function modifyImageViaAI(
   backendUrl: string,
   image: {uri: string; name: string; type: string} | string,
   prompt: string,
+  subjectImage?: {uri: string; name: string; type: string} | string,
 ): Promise<{prompt: string}> {
   const formData = new FormData();
-  formData.append('prompt', prompt);
+  if (prompt) {
+    formData.append('prompt', prompt);
+  }
 
   if (typeof image === 'string') {
     formData.append('imageUrl', image);
   } else {
-    // If it's a local file path / asset from image picker
     formData.append('image', image as unknown as Blob);
+  }
+
+  if (subjectImage) {
+    if (typeof subjectImage === 'string') {
+      formData.append('subjectImageUrl', subjectImage);
+    } else {
+      formData.append('subjectImage', subjectImage as unknown as Blob);
+    }
   }
 
   return postMultipart<{prompt: string}>(
@@ -127,4 +137,68 @@ async function postMultipart<T>(url: string, body: FormData): Promise<T> {
 
 function normalizeBaseUrl(url: string) {
   return url.replace(/\/+$/, '');
+}
+
+export type PublicMeme = {
+  id: string;
+  caption: string;
+  tone: string;
+  imageUrl: string;
+  author: string;
+  createdAt: string;
+};
+
+export async function fetchPublicMemes(backendUrl: string): Promise<PublicMeme[]> {
+  const response = await fetch(`${normalizeBaseUrl(backendUrl)}/api/public-memes`);
+  if (!response.ok) {
+    throw new Error(`Erreur récupération de la galerie (${response.status})`);
+  }
+  return response.json();
+}
+
+export async function publishMemeToGallery(
+  backendUrl: string,
+  caption: string,
+  tone: string,
+  imageUrl: string,
+  author?: string,
+): Promise<PublicMeme> {
+  const response = await fetch(`${normalizeBaseUrl(backendUrl)}/api/public-memes`, {
+    method: 'POST',
+    headers: {
+      Accept: 'application/json',
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({caption, tone, imageUrl, author}),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Erreur publication dans la galerie (${response.status})`);
+  }
+  return response.json();
+}
+
+export async function uploadMemeImage(
+  backendUrl: string,
+  imageUri: string,
+): Promise<{url: string}> {
+  const formData = new FormData();
+  formData.append('image', {
+    uri: imageUri,
+    name: 'meme_upload.png',
+    type: 'image/png',
+  } as unknown as Blob);
+
+  const response = await fetch(`${normalizeBaseUrl(backendUrl)}/api/public-memes/upload`, {
+    method: 'POST',
+    headers: {
+      Accept: 'application/json',
+    },
+    body: formData,
+  });
+
+  if (!response.ok) {
+    throw new Error(`Erreur upload de l'image du mème (${response.status})`);
+  }
+  return response.json();
 }

@@ -1,5 +1,5 @@
 import React, {useState} from 'react';
-import {StyleSheet, Text, View} from 'react-native';
+import {StyleSheet, Text, View, ImageBackground} from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import {useAppTheme} from '../theme/ThemeProvider';
 import {rainbow, spacing, typography} from '../theme/theme';
@@ -15,6 +15,7 @@ type MemePreviewProps = {
   caption: string;
   tone?: string;
   transcription?: string;
+  imageUri?: string;
 };
 
 export function MemePreview({
@@ -22,6 +23,7 @@ export function MemePreview({
   caption,
   tone,
   transcription,
+  imageUri,
 }: MemePreviewProps) {
   const {colors} = useAppTheme();
   const [status, setStatus] = useState<string | null>(null);
@@ -57,7 +59,16 @@ export function MemePreview({
         </View>
       ) : undefined}
 
-      <Text style={[styles.caption, {color: colors.text}]}>"{caption}"</Text>
+      {imageUri ? (
+        <ImageBackground
+          source={{uri: imageUri}}
+          style={styles.memeImageBg}
+          imageStyle={styles.memeImageStyle}>
+          <Text style={styles.memeImageText}>{caption}</Text>
+        </ImageBackground>
+      ) : (
+        <Text style={[styles.caption, {color: colors.text}]}>"{caption}"</Text>
+      )}
       {tone ? <Badge label={`Ton : ${tone}`} tone="warning" /> : undefined}
 
       <View style={styles.actions}>
@@ -66,6 +77,7 @@ export function MemePreview({
           onPress={() => {
             navigation.navigate('Atelier', {
               caption: caption,
+              imageUri: imageUri,
             });
           }}
           icon={<IconSymbol name="atelier" color={colors.text} size={18} />}
@@ -127,5 +139,29 @@ const styles = StyleSheet.create({
     ...typography.caption,
     textAlign: 'center',
     marginTop: spacing.md,
+  },
+  memeImageBg: {
+    width: '100%',
+    aspectRatio: 1.2,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: spacing.xl,
+    marginBottom: spacing.lg,
+  },
+  memeImageStyle: {
+    borderRadius: 16,
+  },
+  memeImageText: {
+    color: '#FFFFFF',
+    fontSize: 20,
+    fontWeight: '900',
+    textAlign: 'center',
+    textTransform: 'uppercase',
+    textShadowColor: '#000000',
+    textShadowOffset: {width: 2, height: 2},
+    textShadowRadius: 3,
+    backgroundColor: 'rgba(0,0,0,0.18)',
+    padding: spacing.md,
+    borderRadius: 8,
   },
 });

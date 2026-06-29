@@ -27,6 +27,7 @@ const tools = [
   {icon: 'sticker' as const, title: 'Sticker', type: 'sticker'},
   {icon: 'image' as const, title: 'Image', type: 'image'},
   {icon: 'background' as const, title: 'Fond', type: 'background'},
+  {icon: 'face' as const, title: 'Fusion', type: 'face_swap'},
 ];
 
 type EditorLayer = {
@@ -84,6 +85,12 @@ export function AtelierScreen() {
   const [aiModifyLoading, setAiModifyLoading] = useState(false);
   const [aiModifyError, setAiModifyError] = useState<string | null>(null);
 
+  const [publishing, setPublishing] = useState(false);
+  const [fusionImage1, setFusionImage1] = useState<string | null>(null);
+  const [fusionImage2, setFusionImage2] = useState<string | null>(null);
+  const [fusionLoading, setFusionLoading] = useState(false);
+  const [fusionError, setFusionError] = useState<string | null>(null);
+
   function handleGenerateAISticker() {
     if (!aiStickerPrompt.trim()) return;
     setAiStickerLoading(true);
@@ -130,25 +137,148 @@ export function AtelierScreen() {
       setAiModifyLoading(false);
     }
   }
+
+  async function pickFusionImage1() {
+    launchImageLibrary({mediaType: 'photo', quality: 0.8}, response => {
+      if (response.assets && response.assets.length > 0) {
+        const asset = response.assets[0];
+        if (asset.uri) {
+          setFusionImage1(asset.uri);
+        }
+      }
+    });
+  }
+
+  async function pickFusionImage2() {
+    launchImageLibrary({mediaType: 'photo', quality: 0.8}, response => {
+      if (response.assets && response.assets.length > 0) {
+        const asset = response.assets[0];
+        if (asset.uri) {
+          setFusionImage2(asset.uri);
+        }
+      }
+    });
+  }
+
+  async function handleFaceSwapAI() {
+    if (!fusionImage1 || !fusionImage2) return;
+    setFusionLoading(true);
+    setFusionError(null);
+
+    try {
+      const img1Obj = {
+        uri: fusionImage1,
+        name: 'fusion1.jpg',
+        type: 'image/jpeg',
+      };
+      const img2Obj = {
+        uri: fusionImage2,
+        name: 'fusion2.jpg',
+        type: 'image/jpeg',
+      };
+
+      const result = await modifyImageViaAI(backendUrl, img1Obj, '', img2Obj);
+
+      if (result && result.prompt) {
+        const seed = Math.floor(Math.random() * 1000000);
+        const enhancedPrompt = encodeURIComponent(
+          result.prompt +
+            ', beautiful die-cut cartoon sticker, white border, vector style, isolated background'
+        );
+        const stickerUrl = `https://image.pollinations.ai/prompt/${enhancedPrompt}?width=512&height=512&nologo=true&seed=${seed}`;
+        addLayer('sticker', 'Fusion IA', stickerUrl);
+        setFusionImage1(null);
+        setFusionImage2(null);
+        setActiveTool(null);
+      } else {
+        setFusionError('La fusion a échoué.');
+      }
+    } catch (err: any) {
+      console.warn(err);
+      setFusionError(err.message || 'La fusion a échoué.');
+    } finally {
+      setFusionLoading(false);
+    }
+  }
+
+  async function exportSelectedSticker() {
+    const selected = layers.find(layer => layer.id === selectedLayerId);
+    if (!selected || !selected.uri) return;
+    try {
+      await Share.share({
+        title: 'MemeAI Sticker',
+        url: selected.uri,
+        message: `Sticker créé avec l'IA MemeAI ! ${selected.uri}`,
+      });
+    } catch {
+      Alert.alert('Partage échoué', 'Impossible d’exporter le sticker.');
+    }
+  }
+
+  async function publishMeme() {
+    if (!canvasRef.current) return;
+    try {
+      setPublishing(true);
+      const uri = await captureRef(canvasRef, {
+        format: 'png',
+        quality: 0.9,
+      });
+
+      const {uploadMemeImage, publishMemeToGallery} = require('../services/api');
+      const uploadResult = await uploadMemeImage(backendUrl, uri);
+
+      const textLayer = layers.find(l => l.type === 'text');
+      const caption = textLayer ? textLayer.label : 'Meme créé dans l’Atelier';
+
+      await publishMemeToGallery(
+        backendUrl,
+        caption,
+        'Atelier',
+        uploadResult.url,
+        'Artiste MemeAI'
+      );
+
+      Alert.alert('Publié !', 'Votre création a été ajoutée à la galerie publique.');
+    } catch (err: any) {
+      console.warn(err);
+      Alert.alert('Échec de la publication', err.message || 'Impossible de publier le mème.');
+    } finally {
+      setPublishing(false);
+    }
+  }
   
   const canvasRef = useRef<View>(null);
 
   // Initialize with params from navigation
   useEffect(() => {
     if (route.params?.caption) {
-      const nextLayer: EditorLayer = {
+      const nextLayers: EditorLayer[] = [];
+      if (route.params.imageUri) {
+        nextLayers.push({
+          id: `image-${Date.now()}`,
+          type: 'image',
+          label: 'Photo',
+          uri: route.params.imageUri,
+          x: 0,
+          y: 0,
+          scale: 1,
+          rotation: 0,
+        });
+      }
+      const textLayer: EditorLayer = {
         id: `text-${Date.now()}`,
         type: 'text',
         label: route.params.caption,
         x: 0,
-        y: 0,
+        y: route.params.imageUri ? 80 : 0,
         scale: 1,
         rotation: 0,
         color: '#FFFFFF',
         fontSize: 22,
       };
-      setLayers([nextLayer]);
-      setSelectedLayerId(nextLayer.id);
+      nextLayers.push(textLayer);
+      setLayers(nextLayers);
+      setSelectedLayerId(textLayer.id);
 
       if (route.params.palette) {
         setBackgroundPalette(route.params.palette);
@@ -247,6 +377,27 @@ export function AtelierScreen() {
       <View style={[styles.topHeader, {borderBottomColor: colors.border}]}>
         <Text style={[styles.headerTitle, {color: colors.text}]}>Atelier</Text>
         <View style={styles.headerActions}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Publier le mème"
+            onPress={publishMeme}
+            disabled={publishing}
+            style={({pressed}) => [
+              styles.headerBtn,
+              {backgroundColor: colors.success, marginRight: spacing.xs},
+              publishing && {opacity: 0.6},
+              pressed && styles.pressed,
+            ]}>
+            {publishing ? (
+              <ActivityIndicator size="small" color="#FFFFFF" />
+            ) : (
+              <>
+                <IconSymbol name="magic" color="#FFFFFF" size={16} />
+                <Text style={styles.headerBtnText}>Publier</Text>
+              </>
+            )}
+          </Pressable>
+
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="Partager le mème"
@@ -455,6 +606,67 @@ export function AtelierScreen() {
           </View>
         )}
 
+        {activeTool === 'face_swap' && (
+          <View style={styles.toolSubPanel}>
+            <View style={styles.subPanelHeader}>
+              <Text style={[styles.subPanelTitle, {color: colors.text}]}>Fusion Visage / Contexte</Text>
+              <Pressable onPress={() => setActiveTool(null)}>
+                <IconSymbol name="close" color={colors.text} size={18} />
+              </Pressable>
+            </View>
+
+            <View style={styles.swapInputsContainer}>
+              <View style={styles.swapInputBlock}>
+                <Text style={[styles.swapInputLabel, {color: colors.textMuted}]}>1. Scene / Fond</Text>
+                {fusionImage1 ? (
+                  <Image source={{uri: fusionImage1}} style={styles.swapInputThumb} />
+                ) : (
+                  <View style={[styles.swapInputPlaceholder, {backgroundColor: colors.input}]} />
+                )}
+                <Pressable
+                  onPress={pickFusionImage1}
+                  style={({pressed}) => [styles.pickSwapBtn, {backgroundColor: colors.info}, pressed && styles.pressed]}
+                >
+                  <Text style={styles.pickSwapBtnText}>Choisir</Text>
+                </Pressable>
+              </View>
+
+              <View style={styles.swapInputBlock}>
+                <Text style={[styles.swapInputLabel, {color: colors.textMuted}]}>2. Visage / Sujet</Text>
+                {fusionImage2 ? (
+                  <Image source={{uri: fusionImage2}} style={styles.swapInputThumb} />
+                ) : (
+                  <View style={[styles.swapInputPlaceholder, {backgroundColor: colors.input}]} />
+                )}
+                <Pressable
+                  onPress={pickFusionImage2}
+                  style={({pressed}) => [styles.pickSwapBtn, {backgroundColor: colors.info}, pressed && styles.pressed]}
+                >
+                  <Text style={styles.pickSwapBtnText}>Choisir</Text>
+                </Pressable>
+              </View>
+            </View>
+
+            <Pressable
+              onPress={handleFaceSwapAI}
+              disabled={fusionLoading || !fusionImage1 || !fusionImage2}
+              style={({pressed}) => [
+                styles.fusionActionBtn,
+                {backgroundColor: colors.success},
+                (fusionLoading || !fusionImage1 || !fusionImage2) && {opacity: 0.6},
+                pressed && styles.pressed
+              ]}
+            >
+              {fusionLoading ? (
+                <ActivityIndicator size="small" color="#FFFFFF" />
+              ) : (
+                <Text style={styles.fusionActionBtnText}>Fusionner par IA</Text>
+              )}
+            </Pressable>
+            {fusionError ? <Text style={styles.fusionError}>{fusionError}</Text> : null}
+          </View>
+        )}
+
         {/* Selected Layer Controls (Rot/Scale) */}
         {selectedLayer && !activeTool && (
           <View style={styles.adjustPanel}>
@@ -524,6 +736,23 @@ export function AtelierScreen() {
                   </Pressable>
                 </View>
                 {aiModifyError ? <Text style={styles.aiModifyError}>{aiModifyError}</Text> : null}
+
+                <View style={{marginTop: spacing.md}}>
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel="Exporter ce sticker uniquement"
+                    onPress={exportSelectedSticker}
+                    style={({pressed}) => [
+                      styles.exportStickerBtn,
+                      {backgroundColor: colors.input, borderColor: colors.border},
+                      pressed && styles.pressed,
+                    ]}>
+                    <IconSymbol name="share" color={colors.text} size={15} />
+                    <Text style={{color: colors.text, fontSize: 13, fontWeight: '600', marginLeft: spacing.xs}}>
+                      Exporter ce Sticker uniquement
+                    </Text>
+                  </Pressable>
+                </View>
               </View>
             )}
           </View>
@@ -1051,5 +1280,78 @@ const styles = StyleSheet.create({
     color: '#FF3B30',
     fontSize: 12,
     marginTop: spacing.xs,
+  },
+  exportStickerBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    height: 38,
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: spacing.md,
+  },
+  swapInputsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    width: '100%',
+    marginVertical: spacing.md,
+    gap: spacing.md,
+  },
+  swapInputBlock: {
+    flex: 1,
+    alignItems: 'center',
+    gap: spacing.xs,
+  },
+  swapInputLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  swapInputThumb: {
+    width: 80,
+    height: 80,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#CCCCCC',
+  },
+  swapInputPlaceholder: {
+    width: 80,
+    height: 80,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    borderColor: '#AAAAAA',
+  },
+  pickSwapBtn: {
+    height: 28,
+    paddingHorizontal: spacing.md,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: spacing.xs,
+  },
+  pickSwapBtnText: {
+    color: '#FFFFFF',
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  fusionActionBtn: {
+    height: 40,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: '100%',
+    marginTop: spacing.sm,
+  },
+  fusionActionBtnText: {
+    color: '#FFFFFF',
+    fontWeight: '600',
+    fontSize: 13,
+  },
+  fusionError: {
+    color: '#FF3B30',
+    fontSize: 12,
+    textAlign: 'center',
+    marginTop: spacing.sm,
   },
 });

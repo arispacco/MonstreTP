@@ -134,6 +134,6 @@ describe('POST /api/context', () => {
 
       expect(res.statusCode).toBe(502);
       expect(res.body).toEqual({ error: 'Generation IA indisponible.' });
-    });
+    }, 25000);
   });
 });

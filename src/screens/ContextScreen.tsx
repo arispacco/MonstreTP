@@ -479,7 +479,15 @@ export function ContextScreen() {
                   {error}
                 </Text>
               ) : undefined}
-              <MemePreview caption={result.caption} tone={result.tone} />
+              <MemePreview
+                caption={result.caption}
+                tone={result.tone}
+                imageUri={
+                  fileAttachment && fileAttachment.type.startsWith('image/')
+                    ? fileAttachment.uri
+                    : undefined
+                }
+              />
             </>
           ) : (
             <AppCard>

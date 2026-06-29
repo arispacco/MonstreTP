@@ -65,7 +65,8 @@ export function StatusRemixerScreen() {
     }
     try {
       let granted = false;
-      if (typeof Platform.Version === 'number' && Platform.Version >= 33) {
+      const sdkVer = typeof Platform.Version === 'string' ? parseInt(Platform.Version, 10) : Platform.Version;
+      if (sdkVer >= 33) {
         const results = await PermissionsAndroid.requestMultiple([
           PermissionsAndroid.PERMISSIONS.READ_MEDIA_IMAGES,
           PermissionsAndroid.PERMISSIONS.READ_MEDIA_VIDEO,

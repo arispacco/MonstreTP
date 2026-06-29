@@ -412,6 +412,100 @@ async function generatePromptForModifiedImage(imagePathOrUrl, userRequest) {
   return rawText.trim();
 }
 
+async function generatePromptForFaceSwap(image1PathOrUrl, image2PathOrUrl) {
+  const apiKey = process.env.GEMINI_API_KEY;
+  const allowMock = process.env.ALLOW_MOCK_AI !== 'false';
+
+  if (!apiKey) {
+    if (allowMock) {
+      return `a fusion of the subject in the context image, cartoon sticker, white border, isolated background`;
+    }
+    const error = new Error('GEMINI_API_KEY manquante');
+    error.status = 500;
+    error.publicMessage = 'Service IA non configure.';
+    throw error;
+  }
+
+  const model = process.env.GEMINI_MODEL || 'gemini-3.1-flash-lite';
+  const img1Base64 = await loadImageBase64(image1PathOrUrl);
+  const img2Base64 = await loadImageBase64(image2PathOrUrl);
+
+  const prompt = [
+    "Tu es MemeAI, un assistant IA de fusion d'images.",
+    "Analyse l'image 1 (qui represente la scene de fond/le contexte) et l'image 2 (qui represente le sujet/le visage a fusionner).",
+    "Genere un prompt detaille en anglais decrivant ce a quoi l'image finale de fusion doit ressembler.",
+    "Le prompt final doit decrire le sujet de l'image 2 (cheveux, visage, expression) integre de maniere coherente dans la scene et le corps de l'image 1.",
+    "Ajoute des details pour preserver le style general de l'image 1 (par exemple, si c'est un sticker cartoon ou une photo).",
+    "Reponds uniquement avec le prompt descriptif final en anglais, sans formatage JSON ni Markdown, pas de balise ```."
+  ].join('\n');
+
+  let response;
+  try {
+    response = await fetch(
+      `${endpointBase}/${model}:generateContent?key=${apiKey}`,
+      {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+          contents: [
+            {
+              role: 'user',
+              parts: [
+                {
+                  inlineData: {
+                    mimeType: 'image/jpeg',
+                    data: img1Base64,
+                  },
+                },
+                {
+                  inlineData: {
+                    mimeType: 'image/jpeg',
+                    data: img2Base64,
+                  },
+                },
+                {text: prompt},
+              ],
+            },
+          ],
+          generationConfig: {
+            temperature: 0.8,
+            maxOutputTokens: 250,
+          },
+        }),
+      },
+    );
+  } catch (fetchErr) {
+    console.error('Fetch error during generatePromptForFaceSwap:', fetchErr);
+    if (allowMock) {
+      return `a fusion sticker of the subject in the context`;
+    }
+    const error = new Error('Erreur reseau vers l\'API Gemini.');
+    error.status = 502;
+    error.publicMessage = 'Fusion IA indisponible.';
+    throw error;
+  }
+
+  if (!response.ok) {
+    console.error(`Gemini API Error in generatePromptForFaceSwap [${response.status}]`);
+    if (allowMock) {
+      return `a fusion sticker of the subject in the context`;
+    }
+    const error = new Error(`Gemini error ${response.status}`);
+    error.status = 502;
+    error.publicMessage = 'Fusion IA indisponible.';
+    throw error;
+  }
+
+  const payload = await response.json();
+  const rawText =
+    payload.candidates?.[0]?.content?.parts
+      ?.map(part => part.text)
+      .filter(Boolean)
+      .join('\n') || '';
+
+  return rawText.trim();
+}
+
 function parseJsonResponse(rawText) {
   const trimmed = rawText.trim();
   try {
@@ -469,4 +563,5 @@ module.exports = {
   generateCaptionFromVoice,
   generateCaptionFromImage,
   generatePromptForModifiedImage,
+  generatePromptForFaceSwap,
 };
