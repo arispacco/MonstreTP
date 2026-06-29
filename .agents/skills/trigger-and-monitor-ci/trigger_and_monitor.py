@@ -42,7 +42,33 @@ def make_request(url, token=None):
         print(f"Error calling {url}: {e.code} - {e.reason}\nBody: {body}", file=sys.stderr)
         raise e
 
+def setup_ssh_agent():
+    askpass_path = "/tmp/git_askpass.sh"
+    try:
+        with open(askpass_path, "w") as f:
+            f.write("#!/bin/sh\necho ok\n")
+        os.chmod(askpass_path, 0o755)
+        
+        agent_out = subprocess.check_output(["ssh-agent", "-s"]).decode()
+        for line in agent_out.split(";"):
+            if "SSH_AUTH_SOCK=" in line:
+                val = line.split("=")[1].split()[0]
+                os.environ["SSH_AUTH_SOCK"] = val
+            if "SSH_AGENT_PID=" in line:
+                val = line.split("=")[1].split()[0]
+                os.environ["SSH_AGENT_PID"] = val
+                
+        env = os.environ.copy()
+        env["SSH_ASKPASS"] = askpass_path
+        env["SSH_ASKPASS_REQUIRE"] = "force"
+        
+        with open(os.devnull, 'r') as devnull:
+            subprocess.run(["ssh-add"], env=env, stdin=devnull, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    except Exception as e:
+        print(f"Warning: Failed to set up ssh-agent: {e}", file=sys.stderr)
+
 def main():
+    setup_ssh_agent()
     token = os.environ.get("GITHUB_TOKEN") or os.environ.get("GH_TOKEN")
     owner, repo = get_git_remote_info()
     
