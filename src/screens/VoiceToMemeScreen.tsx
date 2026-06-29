@@ -20,6 +20,7 @@ export function VoiceToMemeScreen() {
   const [audioRecorderPlayer] = useState(() => new AudioRecorderPlayer());
   const [result, setResult] = useState<GeneratedMeme | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [selectedTone, setSelectedTone] = useState('Automatic');
 
   useEffect(() => {
     return () => {
@@ -83,7 +84,7 @@ export function VoiceToMemeScreen() {
             uri: resultUri,
             name: 'vocal_enregistrement.mp4',
             type: 'audio/mp4',
-          });
+          }, selectedTone);
           setResult(generated);
           setState('done');
         } else {
@@ -115,6 +116,39 @@ export function VoiceToMemeScreen() {
         <Text style={styles.timer}>{recordTime}</Text>
 
         {error ? <Text style={styles.errorText}>{error}</Text> : undefined}
+
+        <View style={styles.toneSelector}>
+          <Text style={[styles.toneTitle, {color: colors.textMuted}]}>Humour :</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.toneChips}>
+            {[
+              {id: 'Automatic', label: '⚡ Auto'},
+              {id: 'Ironique', label: '😏 Ironique'},
+              {id: 'Humour noir', label: '💀 Noir'},
+              {id: 'Absurde', label: '🤪 Absurde'},
+              {id: 'Jeux de mots', label: '✍️ Mots'},
+            ].map(t => {
+              const active = selectedTone === t.id;
+              return (
+                <Pressable
+                  key={t.id}
+                  disabled={isRecording || isProcessing}
+                  onPress={() => setSelectedTone(t.id)}
+                  style={[
+                    styles.toneChip,
+                    {
+                      backgroundColor: active ? colors.info : colors.input,
+                      borderColor: active ? colors.info : colors.border,
+                      opacity: isRecording || isProcessing ? 0.6 : 1,
+                    },
+                  ]}>
+                  <Text style={[styles.toneChipText, {color: active ? '#FFFFFF' : colors.text}]}>
+                    {t.label}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </ScrollView>
+        </View>
 
         <Pressable
           accessibilityRole="button"
@@ -215,5 +249,32 @@ const styles = StyleSheet.create({
   preview: {
     width: '100%',
     marginTop: 40,
+  },
+  toneSelector: {
+    width: '100%',
+    marginTop: spacing.xl,
+    paddingHorizontal: spacing.sm,
+  },
+  toneTitle: {
+    fontSize: 13,
+    fontWeight: '600',
+    marginBottom: spacing.xs,
+  },
+  toneChips: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    paddingVertical: spacing.xxs,
+  },
+  toneChip: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+    borderRadius: 20,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  toneChipText: {
+    fontSize: 13,
+    fontWeight: '600',
   },
 });

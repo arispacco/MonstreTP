@@ -45,6 +45,7 @@ export function ContextScreen() {
   const [result, setResult] = useState<GeneratedMeme | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [fileAttachment, setFileAttachment] = useState<AttachmentInfo | null>(null);
+  const [selectedTone, setSelectedTone] = useState('Automatic');
 
   // Audio Recorder State
   const [audioRecorderPlayer] = useState(() => new AudioRecorderPlayer());
@@ -225,19 +226,19 @@ export function ContextScreen() {
             uri: fileAttachment.uri,
             name: fileAttachment.name,
             type: fileAttachment.type,
-          });
+          }, selectedTone);
         } else if (fileAttachment.type.startsWith('audio/') || fileAttachment.mode === 'mic') {
           setHelper("Transcription et génération depuis l'audio...");
           generated = await generateMemeFromAudio(backendUrl, {
             uri: fileAttachment.uri,
             name: fileAttachment.name,
             type: fileAttachment.type,
-          });
+          }, selectedTone);
         } else {
-          generated = await generateMemeFromText(backendUrl, text.trim() || fileAttachment.name);
+          generated = await generateMemeFromText(backendUrl, text.trim() || fileAttachment.name, selectedTone);
         }
       } else {
-        generated = await generateMemeFromText(backendUrl, text.trim());
+        generated = await generateMemeFromText(backendUrl, text.trim(), selectedTone);
       }
       setResult(generated);
       setHelper('Mème généré depuis le backend.');
@@ -418,6 +419,37 @@ export function ContextScreen() {
           </Text>
         </View>
 
+        <View style={styles.toneSelector}>
+          <Text style={[styles.toneTitle, {color: colors.textMuted}]}>Humour :</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.toneChips}>
+            {[
+              {id: 'Automatic', label: '⚡ Auto'},
+              {id: 'Ironique', label: '😏 Ironique'},
+              {id: 'Humour noir', label: '💀 Noir'},
+              {id: 'Absurde', label: '🤪 Absurde'},
+              {id: 'Jeux de mots', label: '✍️ Mots'},
+            ].map(t => {
+              const active = selectedTone === t.id;
+              return (
+                <Pressable
+                  key={t.id}
+                  onPress={() => setSelectedTone(t.id)}
+                  style={[
+                    styles.toneChip,
+                    {
+                      backgroundColor: active ? colors.info : colors.input,
+                      borderColor: active ? colors.info : colors.border,
+                    },
+                  ]}>
+                  <Text style={[styles.toneChipText, {color: active ? '#FFFFFF' : colors.text}]}>
+                    {t.label}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </ScrollView>
+        </View>
+
         <GradientButton
           label="Créer le mème"
           loading={loading}
@@ -587,5 +619,30 @@ const styles = StyleSheet.create({
   outputText: {
     ...typography.body,
     textAlign: 'center',
+  },
+  toneSelector: {
+    marginBottom: spacing.lg,
+  },
+  toneTitle: {
+    fontSize: 13,
+    fontWeight: '600',
+    marginBottom: spacing.xs,
+  },
+  toneChips: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    paddingVertical: spacing.xxs,
+  },
+  toneChip: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+    borderRadius: 20,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  toneChipText: {
+    fontSize: 13,
+    fontWeight: '600',
   },
 });

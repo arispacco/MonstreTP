@@ -27,7 +27,7 @@ router.post('/', (req, res, next) => {
     }
 
     try {
-      const result = await generateCaptionFromVoice(req.file.path, req.file.mimetype);
+      const result = await generateCaptionFromVoice(req.file.path, req.file.mimetype, req.body.tone);
       res.json(result);
     } catch (err) {
       next(err);

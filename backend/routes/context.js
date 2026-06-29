@@ -18,7 +18,7 @@ router.post('/', async (req, res, next) => {
       });
     }
 
-    const result = await generateCaptionFromText(text);
+    const result = await generateCaptionFromText(text, req.body.tone);
     res.json(result);
   } catch (error) {
     next(error);

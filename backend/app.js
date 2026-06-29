@@ -5,6 +5,7 @@ const express = require('express');
 const contextRoutes = require('./routes/context');
 const remixerRoutes = require('./routes/remixer');
 const voiceRoutes = require('./routes/voice');
+const modifyRoutes = require('./routes/modify');
 
 const app = express();
 
@@ -22,6 +23,7 @@ app.get('/health', (_req, res) => {
 app.use('/api/context', contextRoutes);
 app.use('/api/voice', voiceRoutes);
 app.use('/api/remixer', remixerRoutes);
+app.use('/api/modify-image', modifyRoutes);
 
 app.use((err, _req, res, _next) => {
   console.error(err);

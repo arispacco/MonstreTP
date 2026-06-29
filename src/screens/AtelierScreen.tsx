@@ -10,14 +10,16 @@ import {
   Share,
   ScrollView,
   Alert,
+  ActivityIndicator,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import {IconSymbol} from '../components/IconSymbol';
 import {useAppTheme} from '../theme/ThemeProvider';
 import {spacing, typography} from '../theme/theme';
 import {useRoute} from '@react-navigation/native';
-import {launchImageLibrary} from 'react-native-image-picker';
 import {captureRef} from 'react-native-view-shot';
+import {useAppConfig} from '../config/AppConfigProvider';
+import {modifyImageViaAI} from '../services/api';
 
 const tools = [
   {icon: 'text' as const, title: 'Text', type: 'text'},
@@ -74,6 +76,60 @@ export function AtelierScreen() {
   
   // Track active sub-tool panel in the toolbox
   const [activeTool, setActiveTool] = useState<string | null>(null);
+
+  const {backendUrl} = useAppConfig();
+  const [aiStickerPrompt, setAiStickerPrompt] = useState('');
+  const [aiStickerLoading, setAiStickerLoading] = useState(false);
+  const [aiModifyPrompt, setAiModifyPrompt] = useState('');
+  const [aiModifyLoading, setAiModifyLoading] = useState(false);
+  const [aiModifyError, setAiModifyError] = useState<string | null>(null);
+
+  function handleGenerateAISticker() {
+    if (!aiStickerPrompt.trim()) return;
+    setAiStickerLoading(true);
+    try {
+      const seed = Math.floor(Math.random() * 1000000);
+      const enhancedPrompt = encodeURIComponent(
+        aiStickerPrompt.trim() +
+          ', beautiful die-cut cartoon sticker, white border, vector style, isolated background'
+      );
+      const stickerUrl = `https://image.pollinations.ai/prompt/${enhancedPrompt}?width=512&height=512&nologo=true&seed=${seed}`;
+      addLayer('sticker', aiStickerPrompt.trim(), stickerUrl);
+      setAiStickerPrompt('');
+    } catch (err) {
+      console.warn(err);
+    } finally {
+      setAiStickerLoading(false);
+    }
+  }
+
+  async function handleModifyImageAI() {
+    const layerToModify = layers.find(layer => layer.id === selectedLayerId);
+    if (!layerToModify || !layerToModify.uri || !aiModifyPrompt.trim()) return;
+
+    setAiModifyLoading(true);
+    setAiModifyError(null);
+
+    try {
+      const result = await modifyImageViaAI(backendUrl, layerToModify.uri, aiModifyPrompt.trim());
+      const seed = Math.floor(Math.random() * 1000000);
+      const styleAppendix = layerToModify.type === 'sticker'
+        ? ', cartoon sticker, white border, isolated background'
+        : '';
+      const enhancedPrompt = encodeURIComponent(result.prompt + styleAppendix);
+      const newUri = `https://image.pollinations.ai/prompt/${enhancedPrompt}?width=512&height=512&nologo=true&seed=${seed}`;
+
+      updateSelectedLayer({
+        uri: newUri,
+        label: aiModifyPrompt.trim()
+      });
+      setAiModifyPrompt('');
+    } catch (err) {
+      setAiModifyError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setAiModifyLoading(false);
+    }
+  }
   
   const canvasRef = useRef<View>(null);
 
@@ -331,6 +387,39 @@ export function AtelierScreen() {
                 <IconSymbol name="close" color={colors.text} size={18} />
               </Pressable>
             </View>
+
+            <View style={styles.aiStickerForm}>
+              <TextInput
+                placeholder="Créer par IA (ex: un singe astronaute)..."
+                value={aiStickerPrompt}
+                onChangeText={setAiStickerPrompt}
+                style={[
+                  styles.aiStickerInput,
+                  {
+                    color: colors.text,
+                    borderColor: colors.border,
+                    backgroundColor: colors.input,
+                  },
+                ]}
+                placeholderTextColor={colors.placeholder}
+              />
+              <Pressable
+                onPress={handleGenerateAISticker}
+                disabled={aiStickerLoading || !aiStickerPrompt.trim()}
+                style={({pressed}) => [
+                  styles.aiStickerBtn,
+                  {backgroundColor: colors.info},
+                  (aiStickerLoading || !aiStickerPrompt.trim()) && {opacity: 0.6},
+                  pressed && styles.pressed,
+                ]}>
+                {aiStickerLoading ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <Text style={styles.aiStickerBtnText}>Créer</Text>
+                )}
+              </Pressable>
+            </View>
+
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.emojiList}>
               {popularStickers.map(stk => (
                 <Pressable key={stk} onPress={() => addLayer('sticker', stk)} style={[styles.stickerItem, {backgroundColor: colors.input}]}>
@@ -399,6 +488,44 @@ export function AtelierScreen() {
                 colors={colors}
               />
             </View>
+
+            {selectedLayer.uri && (
+              <View style={[styles.aiModifyContainer, {borderTopColor: colors.border}]}>
+                <Text style={[styles.aiModifyLabel, {color: colors.textMuted}]}>Modifier par IA :</Text>
+                <View style={styles.aiModifyForm}>
+                  <TextInput
+                    placeholder="Consigne (ex: ajoute des lunettes)..."
+                    value={aiModifyPrompt}
+                    onChangeText={setAiModifyPrompt}
+                    style={[
+                      styles.aiModifyInput,
+                      {
+                        color: colors.text,
+                        borderColor: colors.border,
+                        backgroundColor: colors.input,
+                      },
+                    ]}
+                    placeholderTextColor={colors.placeholder}
+                  />
+                  <Pressable
+                    onPress={handleModifyImageAI}
+                    disabled={aiModifyLoading || !aiModifyPrompt.trim()}
+                    style={({pressed}) => [
+                      styles.aiModifyBtn,
+                      {backgroundColor: colors.info},
+                      (aiModifyLoading || !aiModifyPrompt.trim()) && {opacity: 0.6},
+                      pressed && styles.pressed,
+                    ]}>
+                    {aiModifyLoading ? (
+                      <ActivityIndicator size="small" color="#FFFFFF" />
+                    ) : (
+                      <Text style={styles.aiModifyBtnText}>Modifier</Text>
+                    )}
+                  </Pressable>
+                </View>
+                {aiModifyError ? <Text style={styles.aiModifyError}>{aiModifyError}</Text> : null}
+              </View>
+            )}
           </View>
         )}
 
@@ -519,7 +646,7 @@ function DraggableLayer({
           borderWidth: selected ? 2 : 0,
         },
       ]}>
-      {layer.type === 'image' && layer.uri ? (
+      {layer.uri ? (
         <Image source={{uri: layer.uri}} style={styles.layerImage} />
       ) : (
         <Text
@@ -856,5 +983,73 @@ const styles = StyleSheet.create({
   },
   pressed: {
     opacity: 0.8,
+  },
+  aiStickerForm: {
+    paddingHorizontal: spacing.sm,
+    marginBottom: spacing.xs,
+    flexDirection: 'row',
+    gap: spacing.sm,
+    alignItems: 'center',
+  },
+  aiStickerInput: {
+    flex: 1,
+    height: 40,
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: spacing.sm,
+    fontSize: 13,
+  },
+  aiStickerBtn: {
+    paddingHorizontal: spacing.md,
+    height: 40,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  aiStickerBtnText: {
+    color: '#FFFFFF',
+    fontWeight: '600',
+    fontSize: 13,
+  },
+  aiModifyContainer: {
+    paddingTop: spacing.md,
+    borderTopWidth: 1,
+    marginTop: spacing.md,
+    width: '100%',
+  },
+  aiModifyLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    marginBottom: spacing.xs,
+  },
+  aiModifyForm: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    alignItems: 'center',
+  },
+  aiModifyInput: {
+    flex: 1,
+    height: 40,
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: spacing.sm,
+    fontSize: 13,
+  },
+  aiModifyBtn: {
+    paddingHorizontal: spacing.md,
+    height: 40,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  aiModifyBtnText: {
+    color: '#FFFFFF',
+    fontWeight: '600',
+    fontSize: 13,
+  },
+  aiModifyError: {
+    color: '#FF3B30',
+    fontSize: 12,
+    marginTop: spacing.xs,
   },
 });

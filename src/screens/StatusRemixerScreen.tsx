@@ -36,6 +36,7 @@ export function StatusRemixerScreen() {
   const [loading, setLoading] = useState(false);
   const [placeholderUri, setPlaceholderUri] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [selectedTone, setSelectedTone] = useState('Automatic');
 
   // 1. Create a dummy image locally on mount to support testing mock statuses end-to-end
   useEffect(() => {
@@ -169,9 +170,10 @@ export function StatusRemixerScreen() {
 
       const result = await generateMemeFromImage(backendUrl, {
         uri: imageUri,
+        selectedId: selected.id,
         name: selected.id + '.jpg',
         type: 'image/jpeg',
-      });
+      } as any, selectedTone);
 
       setCaption(result.caption);
     } catch (err) {
@@ -272,6 +274,37 @@ export function StatusRemixerScreen() {
                     ),
                   )}
                 </View>
+
+                <Text style={styles.sheetLabel}>Humour :</Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.toneChips} style={{marginBottom: spacing.lg}}>
+                  {[
+                    {id: 'Automatic', label: '⚡ Auto'},
+                    {id: 'Ironique', label: '😏 Ironique'},
+                    {id: 'Humour noir', label: '💀 Noir'},
+                    {id: 'Absurde', label: '🤪 Absurde'},
+                    {id: 'Jeux de mots', label: '✍️ Mots'},
+                  ].map(t => {
+                    const active = selectedTone === t.id;
+                    return (
+                      <Pressable
+                        key={t.id}
+                        disabled={loading}
+                        onPress={() => setSelectedTone(t.id)}
+                        style={[
+                          styles.toneChip,
+                          {
+                            backgroundColor: active ? colors.info : colors.input,
+                            borderColor: active ? colors.info : colors.border,
+                            opacity: loading ? 0.6 : 1,
+                          },
+                        ]}>
+                        <Text style={[styles.toneChipText, {color: active ? '#FFFFFF' : colors.text}]}>
+                          {t.label}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </ScrollView>
 
                 <GradientButton
                   label="Générer caption IA"
@@ -456,5 +489,22 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: spacing.md,
     marginTop: spacing.lg,
+  },
+  toneChips: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    paddingVertical: spacing.xxs,
+  },
+  toneChip: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+    borderRadius: 20,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  toneChipText: {
+    fontSize: 13,
+    fontWeight: '600',
   },
 });
