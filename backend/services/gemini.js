@@ -17,7 +17,7 @@ async function generateCaptionFromText(text) {
     throw error;
   }
 
-  const model = process.env.GEMINI_MODEL || 'gemini-1.5-flash';
+  const model = process.env.GEMINI_MODEL || 'gemini-3.1-flash-lite';
   const prompt = [
     'Tu es MemeAI, un generateur de captions de memes en francais.',
     'Reponds uniquement en JSON valide avec les champs caption et tone.',
@@ -110,7 +110,7 @@ async function generateCaptionFromVoice(audioFilePath, mimeType) {
     throw error;
   }
 
-  const model = process.env.GEMINI_MODEL || 'gemini-1.5-flash';
+  const model = process.env.GEMINI_MODEL || 'gemini-3.1-flash-lite';
   const audioBase64 = fs.readFileSync(audioFilePath).toString('base64');
   const prompt = [
     'Tu es MemeAI, un transcripteur et generateur de captions de memes en francais.',
@@ -212,7 +212,7 @@ async function generateCaptionFromImage(imageFilePath, mimeType) {
     throw error;
   }
 
-  const model = process.env.GEMINI_MODEL || 'gemini-1.5-flash';
+  const model = process.env.GEMINI_MODEL || 'gemini-3.1-flash-lite';
   const imageBase64 = fs.readFileSync(imageFilePath).toString('base64');
   const prompt = [
     'Tu es MemeAI, un generateur de captions de memes visuels en francais.',
