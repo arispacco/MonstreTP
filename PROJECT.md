@@ -23,10 +23,10 @@ The application is a Node.js/Express backend that provides AI-powered meme capti
 ## Milestones
 | # | Name | Scope | Dependencies | Status |
 |---|------|-------|-------------|--------|
-| 1 | Test Suite Infrastructure Setup | Install Jest, Supertest, cross-env; set up Jest configuration and package.json test script | None | PLANNED |
-| 2 | Integration Test Suite Implementation | Implement integration tests for health, context, voice, and remixer endpoints, testing validation, size limits, and real Gemini API | M1 | PLANNED |
-| 3 | Render Deployment Preparation | Configure `render.yaml` and write the step-by-step `DEPLOY.md` guide | None | PLANNED |
-| 4 | Final Validation & Forensic Audit | Run tests, execute Challenger verification, and perform Forensic Audit | M2, M3 | PLANNED |
+| 1 | Test Suite Infrastructure Setup | Install Jest, Supertest, cross-env; set up Jest configuration and package.json test script | None | DONE |
+| 2 | Integration Test Suite Implementation | Implement integration tests for health, context, voice, and remixer endpoints, testing validation, size limits, and real Gemini API | M1 | DONE |
+| 3 | Render Deployment Preparation | Configure `render.yaml` and write the step-by-step `DEPLOY.md` guide | None | DONE |
+| 4 | Final Validation & Forensic Audit | Run tests, execute Challenger verification, and perform Forensic Audit | M2, M3 | DONE |
 
 ## Interface Contracts
 ### `GET /health`

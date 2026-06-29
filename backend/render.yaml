@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: memeai-backend
+    runtime: node
+    rootDir: backend
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: PORT
+        value: "3000"
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: ALLOW_MOCK_AI
+        value: "false"
+      - key: GEMINI_MODEL
+        value: gemini-1.5-flash

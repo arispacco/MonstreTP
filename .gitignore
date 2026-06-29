@@ -70,6 +70,8 @@ build-release.log
 
 # testing
 /coverage
+backend/coverage
+
 
 # Yarn
 .yarn/*
@@ -78,3 +80,7 @@ build-release.log
 !.yarn/releases
 !.yarn/sdks
 !.yarn/versions
+
+# Agents
+.agents/*
+!.agents/skills/
