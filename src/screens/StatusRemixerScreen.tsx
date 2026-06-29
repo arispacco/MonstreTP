@@ -101,12 +101,25 @@ export function StatusRemixerScreen() {
     }
 
     async function scanWhatsAppStatuses() {
-      const WHATSAPP_STATUS_PATH = `${RNFS.ExternalStorageDirectoryPath}/Android/media/com.whatsapp/WhatsApp/Media/.Statuses`;
+      const paths = [
+        `${RNFS.ExternalStorageDirectoryPath}/Android/media/com.whatsapp/WhatsApp/Media/.Statuses`,
+        `${RNFS.ExternalStorageDirectoryPath}/Android/media/com.whatsapp.w4b/WhatsApp Business/Media/.Statuses`,
+        `${RNFS.ExternalStorageDirectoryPath}/WhatsApp/Media/.Statuses`,
+        `${RNFS.ExternalStorageDirectoryPath}/WhatsApp Business/Media/.Statuses`,
+      ];
+
       try {
-        const exists = await RNFS.exists(WHATSAPP_STATUS_PATH);
-        if (exists) {
-          const files = await RNFS.readDir(WHATSAPP_STATUS_PATH);
-          const mapped = files
+        let allFiles = [];
+        for (const p of paths) {
+          const exists = await RNFS.exists(p);
+          if (exists) {
+            const files = await RNFS.readDir(p);
+            allFiles = [...allFiles, ...files];
+          }
+        }
+
+        if (allFiles.length > 0) {
+          const mapped = allFiles
             .filter(f => f.isFile() && /\.(jpe?g|png|gif|mp4)$/i.test(f.name))
             .map((f, index) => {
               const isVideo = f.name.toLowerCase().endsWith('.mp4');
@@ -122,11 +135,13 @@ export function StatusRemixerScreen() {
                 type: isVideo ? 'video' : 'image',
                 colors: fallbackColors,
                 uri: `file://${f.path}`,
-              } as StatusItem;
+              };
             });
-          setStatuses(mapped);
+          // Deduplicate items by filename/id
+          const unique = mapped.filter((v, i, a) => a.findIndex(t => t.id === v.id) === i);
+          setStatuses(unique);
         } else {
-          console.log('WhatsApp statuses directory not found. Using mock data.');
+          console.log('WhatsApp status directories empty or not found. Using mock data.');
           setStatuses(mockStatuses);
         }
       } catch (err) {
