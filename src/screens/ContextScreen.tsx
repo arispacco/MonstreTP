@@ -1,4 +1,5 @@
 import React, {useState, useEffect} from 'react';
+import {useNavigation} from '@react-navigation/native';
 import {
   ActivityIndicator,
   Pressable,
@@ -37,6 +38,7 @@ type AttachmentInfo = {
 export function ContextScreen() {
   const {colors} = useAppTheme();
   const {backendUrl} = useAppConfig();
+  const navigation = useNavigation<any>();
   const [text, setText] = useState('');
   const [loading, setLoading] = useState(false);
   const [helper, setHelper] = useState(
@@ -270,6 +272,60 @@ export function ContextScreen() {
       <ScrollView
         contentContainerStyle={styles.content}
         keyboardShouldPersistTaps="handled">
+        
+        <View style={styles.subNavigationRow}>
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => navigation.navigate('StatusRemixer')}
+            style={({pressed}) => [
+              styles.subNavigationCard,
+              {
+                backgroundColor: colors.card,
+                borderColor: colors.border,
+              },
+              pressed && styles.pressed,
+            ]}>
+            <IconSymbol name="folder" color={colors.info} size={20} />
+            <Text style={[styles.subNavigationText, {color: colors.text}]}>
+              Statuts WA
+            </Text>
+          </Pressable>
+
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => navigation.navigate('VoiceToMeme')}
+            style={({pressed}) => [
+              styles.subNavigationCard,
+              {
+                backgroundColor: colors.card,
+                borderColor: colors.border,
+              },
+              pressed && styles.pressed,
+            ]}>
+            <IconSymbol name="mic" color={colors.success} size={20} />
+            <Text style={[styles.subNavigationText, {color: colors.text}]}>
+              Voice to Meme
+            </Text>
+          </Pressable>
+
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => navigation.navigate('ContextReader')}
+            style={({pressed}) => [
+              styles.subNavigationCard,
+              {
+                backgroundColor: colors.card,
+                borderColor: colors.border,
+              },
+              pressed && styles.pressed,
+            ]}>
+            <IconSymbol name="camera" color={colors.warning} size={20} />
+            <Text style={[styles.subNavigationText, {color: colors.text}]}>
+              Scanner
+            </Text>
+          </Pressable>
+        </View>
+
         <View style={styles.inputWrap}>
           <TextInputBox
             accessibilityLabel="Contexte à transformer en mème"
@@ -652,5 +708,26 @@ const styles = StyleSheet.create({
   toneChipText: {
     fontSize: 13,
     fontWeight: '600',
+  },
+  subNavigationRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: spacing.md,
+    marginBottom: spacing.xl,
+  },
+  subNavigationCard: {
+    flex: 1,
+    minHeight: 70,
+    borderRadius: 16,
+    borderWidth: 1,
+    padding: spacing.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+  },
+  subNavigationText: {
+    fontSize: 12,
+    fontWeight: '600',
+    textAlign: 'center',
   },
 });
