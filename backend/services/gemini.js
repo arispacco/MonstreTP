@@ -347,6 +347,8 @@ async function generatePromptForModifiedImage(imagePathOrUrl, userRequest) {
     `L'utilisateur a l'image fournie et souhaite la modifier avec cette instruction : "${userRequest}".`,
     "Analyse l'image et l'instruction, puis genere uniquement un prompt detaille en anglais decrivant ce a quoi l'image finale modifiee doit ressembler.",
     "Ce prompt sera envoye a un generateur d'images (comme Stable Diffusion).",
+    "CRITICAL: Le prompt final DOIT ABSOLUMENT decrire et preserver les caracteristiques physiques d'origine des personnes presentes sur l'image d'origine (ethnicite, couleur de peau, traits de visage, texture et couleur des cheveux, vetements) SAUF si l'instruction de l'utilisateur demande explicitement de les changer.",
+    "CRITICAL: Tu dois conserver l'arriere-plan (background), le décor, la pose, la structure générale et le style artistique de l'image d'origine (par exemple, si c'est un sticker cartoon avec bordure blanche, le résultat doit rester un sticker cartoon avec bordure blanche et le meme decor).",
     "Ajoute des details sur les elements ajoutes, modifies ou le style (par exemple, precise 'cartoon style sticker, white border, vector, isolated background' s'il s'agit d'un sticker).",
     "Reponds uniquement avec le prompt descriptif en anglais, sans formatage JSON ni Markdown, pas de balise ```."
   ].join('\n');
@@ -432,9 +434,11 @@ async function generatePromptForFaceSwap(image1PathOrUrl, image2PathOrUrl) {
 
   const prompt = [
     "Tu es MemeAI, un assistant IA de fusion d'images.",
-    "Analyse l'image 1 (qui represente la scene de fond/le contexte) et l'image 2 (qui represente le sujet/le visage a fusionner).",
+    "Analyse l'image 1 (qui represente la scene de fond/le contexte/le corps) et l'image 2 (qui represente le sujet/le visage a fusionner).",
     "Genere un prompt detaille en anglais decrivant ce a quoi l'image finale de fusion doit ressembler.",
-    "Le prompt final doit decrire le sujet de l'image 2 (cheveux, visage, expression) integre de maniere coherente dans la scene et le corps de l'image 1.",
+    "Le prompt final doit decrire le sujet de l'image 2 (cheveux, visage, expression, couleur de peau, ethnicite) integre de maniere coherente dans la scene et le corps de l'image 1.",
+    "CRITICAL: Tu dois ABSOLUMENT preserver la couleur de peau, l'ethnicite et les traits du visage du sujet de l'image 2 (le visage a fusionner). Ne change pas la couleur de peau pour du blanc s'il est noir, et vice-versa.",
+    "CRITICAL: Tu dois conserver integralement l'arriere-plan, le decor, la pose et le style artistique general de l'image 1 (par exemple, si c'est un sticker cartoon ou une photo reelle, le resultat doit conserver le meme style et le meme decor exact).",
     "Ajoute des details pour preserver le style general de l'image 1 (par exemple, si c'est un sticker cartoon ou une photo).",
     "Reponds uniquement avec le prompt descriptif final en anglais, sans formatage JSON ni Markdown, pas de balise ```."
   ].join('\n');
