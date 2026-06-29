@@ -877,18 +877,29 @@ function DraggableLayer({
         }
       },
       onPanResponderMove: (evt, gestureState) => {
-        if (evt.nativeEvent.touches.length >= 2) {
-          const newDistance = getDistance(evt.nativeEvent.touches);
-          if (startDistance.current > 0) {
+        const touches = evt.nativeEvent.touches;
+        if (touches.length >= 2) {
+          const newDistance = getDistance(touches);
+          if (startDistance.current === 0) {
+            startDistance.current = newDistance;
+            startScale.current = layerRef.current.scale || 1;
+          } else {
             const scaleFactor = newDistance / startDistance.current;
             onUpdate({ scale: startScale.current * scaleFactor });
           }
         } else {
+          startDistance.current = 0;
           onUpdate({
             x: startPos.current.x + gestureState.dx,
             y: startPos.current.y + gestureState.dy,
           });
         }
+      },
+      onPanResponderRelease: () => {
+        startDistance.current = 0;
+      },
+      onPanResponderTerminate: () => {
+        startDistance.current = 0;
       },
     }),
   ).current;

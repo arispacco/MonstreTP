@@ -11,6 +11,7 @@ import {
   StyleSheet,
   Text,
   View,
+  AppState,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import RNFS from 'react-native-fs';
@@ -34,11 +35,12 @@ export function StatusRemixerScreen() {
   const [permissionGranted, setPermissionGranted] = useState(false);
   const [statuses, setStatuses] = useState<StatusItem[]>([]);
   const [selected, setSelected] = useState<StatusItem | null>(null);
-  const [caption, setCaption] = useState('Sélectionne un statut pour commencer le remix.');
   const [loading, setLoading] = useState(false);
   const [placeholderUri, setPlaceholderUri] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [selectedTone, setSelectedTone] = useState('Automatic');
+  const [caption, setCaption] = useState<string>('');
+  const [selectedTone, setSelectedTone] = useState<ToneType>('ironique');
+  const [refreshKey, setRefreshKey] = useState(0);
 
   // 1. Create a dummy image locally on mount to support testing mock statuses end-to-end
   useEffect(() => {
@@ -77,8 +79,6 @@ export function StatusRemixerScreen() {
               text: 'Ouvrir Paramètres',
               onPress: () => {
                 Linking.openSettings();
-                // Optimistically attempt to load them later
-                setTimeout(() => setPermissionGranted(true), 2000);
               }
             },
             { text: 'Annuler', style: 'cancel' }
@@ -109,6 +109,21 @@ export function StatusRemixerScreen() {
     if (Platform.OS === 'android') {
       requestStoragePermission();
     }
+
+    const subscription = AppState.addEventListener('change', nextAppState => {
+      if (nextAppState === 'active') {
+        const sdkVer = typeof Platform.Version === 'string' ? parseInt(Platform.Version, 10) : Platform.Version;
+        if (sdkVer >= 30) {
+          // Re-trigger scan when returning to the app
+          setPermissionGranted(true);
+          setRefreshKey(k => k + 1);
+        }
+      }
+    });
+
+    return () => {
+      subscription.remove();
+    };
   }, []);
 
   // 3. Scan WhatsApp folder when permission is granted
@@ -168,7 +183,7 @@ export function StatusRemixerScreen() {
     }
 
     scanWhatsAppStatuses();
-  }, [permissionGranted]);
+  }, [permissionGranted, refreshKey]);
 
   // Reset caption when selected item changes
   useEffect(() => {
