@@ -20,6 +20,9 @@ import {useRoute} from '@react-navigation/native';
 import {captureRef} from 'react-native-view-shot';
 import {useAppConfig} from '../config/AppConfigProvider';
 import {modifyImageViaAI} from '../services/api';
+import {launchImageLibrary} from 'react-native-image-picker';
+import RNShare from 'react-native-share';
+import RNFS from 'react-native-fs';
 
 const tools = [
   {icon: 'text' as const, title: 'Text', type: 'text'},
@@ -205,13 +208,20 @@ export function AtelierScreen() {
     const selected = layers.find(layer => layer.id === selectedLayerId);
     if (!selected || !selected.uri) return;
     try {
-      await Share.share({
+      let localUri = selected.uri;
+      if (selected.uri.startsWith('http')) {
+        const cachePath = `${RNFS.CachesDirectoryPath}/sticker_export_${Date.now()}.png`;
+        await RNFS.downloadFile({ fromUrl: selected.uri, toFile: cachePath }).promise;
+        localUri = `file://${cachePath}`;
+      }
+      await RNShare.open({
         title: 'MemeAI Sticker',
-        url: selected.uri,
-        message: `Sticker créé avec l'IA MemeAI ! ${selected.uri}`,
+        url: localUri,
+        message: 'Sticker créé avec l\'IA MemeAI !',
       });
-    } catch {
-      Alert.alert('Partage échoué', 'Impossible d’exporter le sticker.');
+    } catch (err) {
+      console.warn(err);
+      Alert.alert('Partage échoué', 'Impossible d\'exporter le sticker.');
     }
   }
 
@@ -228,7 +238,7 @@ export function AtelierScreen() {
       const uploadResult = await uploadMemeImage(backendUrl, uri);
 
       const textLayer = layers.find(l => l.type === 'text');
-      const caption = textLayer ? textLayer.label : 'Meme créé dans l’Atelier';
+      const caption = textLayer ? textLayer.label : 'Meme créé dans l\'Atelier';
 
       await publishMemeToGallery(
         backendUrl,
@@ -359,10 +369,10 @@ export function AtelierScreen() {
         quality: 0.9,
       });
 
-      await Share.share({
+      await RNShare.open({
         title: 'MemeAI',
         url: uri,
-        message: 'Meme créé avec l’atelier MemeAI !',
+        message: 'Meme créé avec l\'atelier MemeAI !',
       });
     } catch {
       Alert.alert('Exportation échouée', 'Impossible de capturer le canvas.');
@@ -841,20 +851,44 @@ function DraggableLayer({
   onSelect: () => void;
   onUpdate: (updated: Partial<EditorLayer>) => void;
 }) {
+  const layerRef = useRef(layer);
+  layerRef.current = layer;
+
   const startPos = useRef({x: 0, y: 0});
+  const startScale = useRef(1);
+  const startDistance = useRef(0);
+
+  const getDistance = (touches: any) => {
+    const dx = touches[0].pageX - touches[1].pageX;
+    const dy = touches[0].pageY - touches[1].pageY;
+    return Math.sqrt(dx * dx + dy * dy);
+  };
 
   const panResponder = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
-      onPanResponderGrant: () => {
+      onPanResponderGrant: (evt) => {
         onSelect();
-        startPos.current = {x: layer.x, y: layer.y};
+        const currentLayer = layerRef.current;
+        startPos.current = {x: currentLayer.x, y: currentLayer.y};
+        if (evt.nativeEvent.touches.length >= 2) {
+          startDistance.current = getDistance(evt.nativeEvent.touches);
+          startScale.current = currentLayer.scale;
+        }
       },
       onPanResponderMove: (evt, gestureState) => {
-        onUpdate({
-          x: startPos.current.x + gestureState.dx,
-          y: startPos.current.y + gestureState.dy,
-        });
+        if (evt.nativeEvent.touches.length >= 2) {
+          const newDistance = getDistance(evt.nativeEvent.touches);
+          if (startDistance.current > 0) {
+            const scaleFactor = newDistance / startDistance.current;
+            onUpdate({ scale: startScale.current * scaleFactor });
+          }
+        } else {
+          onUpdate({
+            x: startPos.current.x + gestureState.dx,
+            y: startPos.current.y + gestureState.dy,
+          });
+        }
       },
     }),
   ).current;

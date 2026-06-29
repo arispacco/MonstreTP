@@ -2,13 +2,16 @@ import React from 'react';
 import {StyleSheet, Text, View} from 'react-native';
 import {NavigationContainer, DarkTheme} from '@react-navigation/native';
 import {createBottomTabNavigator} from '@react-navigation/bottom-tabs';
-import {enableScreens} from 'react-native-screens';
+import {createNativeStackNavigator} from '@react-navigation/native-stack';
 import {IconSymbol, type IconName} from '../components/IconSymbol';
 import {AtelierScreen} from '../screens/AtelierScreen';
 import {ContextScreen} from '../screens/ContextScreen';
 import {HomeScreen} from '../screens/HomeScreen';
 import {SettingsScreen} from '../screens/SettingsScreen';
 import {SocialScreen} from '../screens/SocialScreen';
+import {VoiceToMemeScreen} from '../screens/VoiceToMemeScreen';
+import {StatusRemixerScreen} from '../screens/StatusRemixerScreen';
+import {ContextReaderScreen} from '../screens/ContextReaderScreen';
 import {useAppTheme} from '../theme/ThemeProvider';
 import {spacing, typography} from '../theme/theme';
 
@@ -22,7 +25,18 @@ type RootTabParamList = {
 
 const Tab = createBottomTabNavigator<RootTabParamList>();
 
-enableScreens(false);
+const ContextStack = createNativeStackNavigator();
+
+function CreerStack() {
+  return (
+    <ContextStack.Navigator screenOptions={{headerShown: false}}>
+      <ContextStack.Screen name="ContextMain" component={ContextScreen} />
+      <ContextStack.Screen name="VoiceToMeme" component={VoiceToMemeScreen} />
+      <ContextStack.Screen name="StatusRemixer" component={StatusRemixerScreen} />
+      <ContextStack.Screen name="ContextReader" component={ContextReaderScreen} />
+    </ContextStack.Navigator>
+  );
+}
 
 const tabConfig = {
   Home: {icon: 'home', label: 'Home'},
@@ -139,7 +153,7 @@ export function AppNavigator() {
         />
         <Tab.Screen
           name="Context"
-          component={ContextScreen}
+          component={CreerStack}
           options={contextOptions}
         />
         <Tab.Screen

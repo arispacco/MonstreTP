@@ -95,6 +95,13 @@ export function StatusRemixerScreen() {
     }
   }
 
+  // 2b. Auto-request storage permission on mount (Android)
+  useEffect(() => {
+    if (Platform.OS === 'android') {
+      requestStoragePermission();
+    }
+  }, []);
+
   // 3. Scan WhatsApp folder when permission is granted
   useEffect(() => {
     if (!permissionGranted) {

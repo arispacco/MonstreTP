@@ -1,1 +1,18 @@
-[]
+[
+  {
+    "id": "meme-1782747757888-687",
+    "caption": "Quand tu attends que le wifi revienne pour enfin commencer à travailler.",
+    "tone": "Atelier",
+    "imageUrl": "/uploads/public/public-1782747757485-202912258.png",
+    "author": "Artiste MemeAI",
+    "createdAt": "2026-06-29T15:42:37.888Z"
+  },
+  {
+    "id": "meme-1782747911693-126",
+    "caption": "Meme créé dans l’Atelier",
+    "tone": "Atelier",
+    "imageUrl": "/uploads/public/public-1782747911331-244107082.png",
+    "author": "Artiste MemeAI",
+    "createdAt": "2026-06-29T15:45:11.693Z"
+  }
+]
