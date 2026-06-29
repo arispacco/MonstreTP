@@ -1,6 +1,6 @@
 import React, {createContext, useContext, useMemo, useState} from 'react';
 
-const DEFAULT_BACKEND_URL = 'http://10.0.2.2:3000';
+const DEFAULT_BACKEND_URL = 'https://monstretp.onrender.com';
 
 type AppConfigContextValue = {
   backendUrl: string;
