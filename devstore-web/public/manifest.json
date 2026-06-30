@@ -1,0 +1,17 @@
+{
+  "short_name": "Dev Store",
+  "name": "Dev Store - Plateforme d'applications mobiles",
+  "icons": [
+    {
+      "src": "icon-512.png",
+      "type": "image/png",
+      "sizes": "512x512",
+      "purpose": "any maskable"
+    }
+  ],
+  "start_url": "/",
+  "background_color": "#FFFFFF",
+  "theme_color": "#01875F",
+  "display": "standalone",
+  "orientation": "portrait"
+}
