@@ -9,6 +9,9 @@ export async function generateMemeFromText(
   backendUrl: string,
   text: string,
   tone?: string,
+  country?: string,
+  format?: string,
+  style?: string,
 ): Promise<GeneratedMeme> {
   const response = await fetch(`${normalizeBaseUrl(backendUrl)}/api/context`, {
     method: 'POST',
@@ -16,7 +19,7 @@ export async function generateMemeFromText(
       Accept: 'application/json',
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({text, tone}),
+    body: JSON.stringify({text, tone, country, format, style}),
   });
 
   if (!response.ok) {

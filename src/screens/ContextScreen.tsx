@@ -48,6 +48,10 @@ export function ContextScreen() {
   const [error, setError] = useState<string | null>(null);
   const [fileAttachment, setFileAttachment] = useState<AttachmentInfo | null>(null);
   const [selectedTone, setSelectedTone] = useState('Automatic');
+  const [selectedFormat, setSelectedFormat] = useState<'text' | 'image'>('text');
+  const [selectedCountry, setSelectedCountry] = useState('Global');
+  const [selectedStyle, setSelectedStyle] = useState('cartoon');
+  const [generatedImageUri, setGeneratedImageUri] = useState<string | undefined>(undefined);
 
   // Audio Recorder State
   const [audioRecorderPlayer] = useState(() => new AudioRecorderPlayer());
@@ -217,6 +221,7 @@ export function ContextScreen() {
     setLoading(true);
     setResult(null);
     setError(null);
+    setGeneratedImageUri(undefined);
     setHelper("L'IA mélange le contexte, le ton et la punchline.");
 
     try {
@@ -237,12 +242,19 @@ export function ContextScreen() {
             type: fileAttachment.type,
           }, selectedTone);
         } else {
-          generated = await generateMemeFromText(backendUrl, text.trim() || fileAttachment.name, selectedTone);
+          generated = await generateMemeFromText(backendUrl, text.trim() || fileAttachment.name, selectedTone, selectedCountry, selectedFormat, selectedStyle);
         }
       } else {
-        generated = await generateMemeFromText(backendUrl, text.trim(), selectedTone);
+        generated = await generateMemeFromText(backendUrl, text.trim(), selectedTone, selectedCountry, selectedFormat, selectedStyle);
       }
       setResult(generated);
+      if (generated.imagePrompt) {
+        const seed = Math.floor(Math.random() * 1000000);
+        const finalImageUri = `https://image.pollinations.ai/prompt/${encodeURIComponent(generated.imagePrompt)}?width=512&height=512&nologo=true&seed=${seed}`;
+        setGeneratedImageUri(finalImageUri);
+      } else {
+        setGeneratedImageUri(undefined);
+      }
       setHelper('Mème généré depuis le backend.');
     } catch (apiError) {
       const message =
@@ -506,6 +518,108 @@ export function ContextScreen() {
           </ScrollView>
         </View>
 
+        {/* Format Selector */}
+        <View style={styles.toneSelector}>
+          <Text style={[styles.toneTitle, {color: colors.textMuted}]}>Format de mème :</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.toneChips}>
+            {[
+              {id: 'text', label: '📝 Texte'},
+              {id: 'image', label: '🖼️ Image'},
+            ].map(f => {
+              const active = selectedFormat === f.id;
+              return (
+                <Pressable
+                  key={f.id}
+                  onPress={() => {
+                    setSelectedFormat(f.id as 'text' | 'image');
+                    if (f.id === 'text') setGeneratedImageUri(undefined);
+                  }}
+                  style={[
+                    styles.toneChip,
+                    {
+                      backgroundColor: active ? colors.info : colors.input,
+                      borderColor: active ? colors.info : colors.border,
+                    },
+                  ]}>
+                  <Text style={[styles.toneChipText, {color: active ? '#FFFFFF' : colors.text}]}>
+                    {f.label}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </ScrollView>
+        </View>
+
+        {/* Country Selector */}
+        <View style={styles.toneSelector}>
+          <Text style={[styles.toneTitle, {color: colors.textMuted}]}>Pays cible (humour local) :</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.toneChips}>
+            {[
+              {id: 'Global', label: '🌍 Global'},
+              {id: 'Cameroun', label: '🇨🇲 Cameroun'},
+              {id: 'France', label: '🇫🇷 France / Europe'},
+              {id: 'Cote d\'Ivoire', label: '🇨🇮 Côte d\'Ivoire'},
+              {id: 'USA', label: '🇺🇸 USA'},
+            ].map(c => {
+              const active = selectedCountry === c.id;
+              return (
+                <Pressable
+                  key={c.id}
+                  onPress={() => setSelectedCountry(c.id)}
+                  style={[
+                    styles.toneChip,
+                    {
+                      backgroundColor: active ? colors.info : colors.input,
+                      borderColor: active ? colors.info : colors.border,
+                    },
+                  ]}>
+                  <Text style={[styles.toneChipText, {color: active ? '#FFFFFF' : colors.text}]}>
+                    {c.label}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </ScrollView>
+        </View>
+
+        {/* Style Selector */}
+        {selectedFormat === 'image' ? (
+          <View style={styles.toneSelector}>
+            <Text style={[styles.toneTitle, {color: colors.textMuted}]}>Style artistique :</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.toneChips}>
+              {[
+                {id: 'anime', label: '🌸 Animé'},
+                {id: 'dessin anime', label: '🎨 Dessin animé'},
+                {id: 'mangas', label: '📚 Manga'},
+                {id: 'disney', label: '🏰 Disney'},
+                {id: 'cartoon', label: '✏️ Cartoon'},
+                {id: 'mignon', label: '🦊 Mignon'},
+                {id: 'emojis', label: '😜 Emojis'},
+                {id: 'stickers whatsapp', label: '💬 Sticker WA'},
+                {id: 'stickers', label: '🏷️ Sticker'},
+              ].map(s => {
+                const active = selectedStyle === s.id;
+                return (
+                  <Pressable
+                    key={s.id}
+                    onPress={() => setSelectedStyle(s.id)}
+                    style={[
+                      styles.toneChip,
+                      {
+                        backgroundColor: active ? colors.info : colors.input,
+                        borderColor: active ? colors.info : colors.border,
+                      },
+                    ]}>
+                    <Text style={[styles.toneChipText, {color: active ? '#FFFFFF' : colors.text}]}>
+                      {s.label}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </ScrollView>
+          </View>
+        ) : null}
+
         <GradientButton
           label="Créer le mème"
           loading={loading}
@@ -539,9 +653,9 @@ export function ContextScreen() {
                 caption={result.caption}
                 tone={result.tone}
                 imageUri={
-                  fileAttachment && fileAttachment.type.startsWith('image/')
+                  generatedImageUri || (fileAttachment && fileAttachment.type.startsWith('image/')
                     ? fileAttachment.uri
-                    : undefined
+                    : undefined)
                 }
               />
             </>

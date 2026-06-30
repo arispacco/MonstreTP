@@ -13,13 +13,21 @@ async function loadImageBase64(pathOrUrl) {
   }
 }
 
-async function generateCaptionFromText(text, tone) {
+async function generateCaptionFromText(text, tone, country, format, style) {
   const apiKey = process.env.GEMINI_API_KEY;
   const allowMock = process.env.ALLOW_MOCK_AI !== 'false';
 
+  const mockResponse = {
+    caption: `Quand "${text.slice(0, 50)}..." devient beaucoup trop reel.`,
+    tone: 'Mock gratuit',
+  };
+  if (format === 'image') {
+    mockResponse.imagePrompt = `a cartoon sticker of ${text.slice(0, 30)}, white border, vector, isolated background`;
+  }
+
   if (!apiKey) {
     if (allowMock) {
-      return mockCaption(text);
+      return mockResponse;
     }
 
     const error = new Error('GEMINI_API_KEY manquante');
@@ -33,11 +41,23 @@ async function generateCaptionFromText(text, tone) {
     ? `Le ton humoristique de la caption doit etre specifiquement de type: "${tone}".`
     : 'Choisis le ton humoristique le plus adapte au contexte.';
 
+  const countryInstruction = country && country !== 'Global'
+    ? `L'humour et les references culturelles de la caption doivent etre cibles specifiquement pour le public du pays: "${country}". Utilise l'argot local, les expressions populaires et le contexte culturel de ce pays si c'est pertinent.`
+    : 'Utilise un humour general, sans ciblage culturel specifique.';
+
+  const formatInstruction = format === 'image'
+    ? `IMPORTANT: L'utilisateur veut generer une image pour ce meme. Tu devez repondre en JSON avec 3 champs:
+      1. "caption": La legende textuelle drole du mème.
+      2. "imagePrompt": Un prompt detaille de description de scene en ANGLAIS pour un generateur d'images (comme Stable Diffusion). Ce prompt doit decrire le visuel du meme correspondant a la caption, dans le style suivant : "${style || 'cartoon'}". S'il s'agit d'un sticker, ajoute 'sticker, white border, vector, isolated background'.
+      3. "tone": Le ton utilise.`
+    : `Reponds en JSON valide avec les champs "caption" et "tone". La caption doit etre courte, drole, et adaptee au texte.`;
+
   const prompt = [
-    'Tu es MemeAI, un generateur de captions de memes en francais.',
-    'Reponds uniquement en JSON valide avec les champs caption et tone.',
+    'Tu es MemeAI, un assistant de generation de memes et de stickers humoristiques.',
+    formatInstruction,
     'La caption doit etre courte, drole, partageable, sans contenu haineux.',
     toneInstruction,
+    countryInstruction,
     `Contexte utilisateur: ${text}`,
   ].join('\n');
 
@@ -57,7 +77,7 @@ async function generateCaptionFromText(text, tone) {
           ],
           generationConfig: {
             temperature: 0.85,
-            maxOutputTokens: 180,
+            maxOutputTokens: 250,
             responseMimeType: 'application/json',
           },
         }),
@@ -66,7 +86,7 @@ async function generateCaptionFromText(text, tone) {
   } catch (fetchErr) {
     console.error('Fetch error during generateCaptionFromText:', fetchErr);
     if (allowMock) {
-      return mockCaption(text);
+      return mockResponse;
     }
     const error = new Error('Erreur reseau vers l\'API Gemini.');
     error.status = 502;
@@ -89,7 +109,7 @@ async function generateCaptionFromText(text, tone) {
     console.error(`Gemini API Error in generateCaptionFromText [${response.status}]: ${errorDetails}`);
 
     if (allowMock) {
-      return mockCaption(text);
+      return mockResponse;
     }
 
     const error = new Error(`Gemini error ${response.status}`);
@@ -107,8 +127,9 @@ async function generateCaptionFromText(text, tone) {
 
   const parsed = parseJsonResponse(rawText);
   return {
-    caption: parsed.caption || mockCaption(text).caption,
-    tone: parsed.tone || tone || 'Humour',
+    caption: parsed.caption || mockResponse.caption,
+    tone: parsed.tone || 'Humour',
+    imagePrompt: parsed.imagePrompt || undefined,
   };
 }
 

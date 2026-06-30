@@ -16,4 +16,5 @@ export type GeneratedMeme = {
   caption: string;
   tone: string;
   transcription?: string;
+  imagePrompt?: string;
 };
