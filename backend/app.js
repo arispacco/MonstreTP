@@ -13,7 +13,7 @@ const app = express();
 
 app.use(cors({origin: true}));
 app.use(express.json({limit: '1mb'}));
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+app.use('/uploads', express.static(path.join(__dirname, 'storage/uploads')));
 app.use(express.static(path.join(__dirname, 'web')));
 
 app.get('/health', (_req, res) => {

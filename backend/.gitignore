@@ -2,5 +2,9 @@ node_modules/
 .env
 uploads/*
 !uploads/.gitkeep
+storage/uploads/*
+!storage/uploads/.gitkeep
+storage/data/*
+!storage/data/.gitkeep
 coverage/
 

@@ -4,8 +4,8 @@ const path = require('path');
 const multer = require('multer');
 
 const router = express.Router();
-const dataFilePath = path.join(__dirname, '../data/public_memes.json');
-const publicUploadsDir = path.join(__dirname, '../uploads/public');
+const dataFilePath = path.join(__dirname, '../storage/data/public_memes.json');
+const publicUploadsDir = path.join(__dirname, '../storage/uploads/public');
 
 // Ensure data folder and file exist
 if (!fs.existsSync(path.dirname(dataFilePath))) {

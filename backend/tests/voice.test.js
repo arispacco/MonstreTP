@@ -6,7 +6,7 @@ const app = require('../app');
 
 describe('POST /api/voice', () => {
   const fixturesDir = path.join(__dirname, 'fixtures', 'voice');
-  const uploadDir = path.join(__dirname, '../uploads');
+  const uploadDir = path.join(__dirname, '../storage/uploads');
   let originalApiKey;
   let originalAllowMock;
   let hasValidApiKey = false;
